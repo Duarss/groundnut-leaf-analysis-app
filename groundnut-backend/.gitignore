@@ -1,0 +1,91 @@
+# ============================
+#  Python Virtual Environment
+# ============================
+.venv/
+venv/
+
+# ============================
+#  Python Cache / Bytecode
+# ============================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ============================
+#  TensorFlow / ML Models
+# ============================
+*.h5
+*.hdf5
+*.ckpt
+*.ckpt.*
+*.pb
+*.savedmodel
+*.tflite
+
+# TensorFlow checkpoints folders
+checkpoint/
+saved_model/
+
+# ============================
+#  Uploaded Files & Generated Outputs
+# ============================
+storage/uploads/*
+storage/masks/*
+storage/overlays/*
+storage/gradcam/*
+
+# Keep the folder structure
+!storage/uploads/.keep
+!storage/masks/.keep
+!storage/overlays/.keep
+!storage/gradcam/.keep
+
+# ============================
+#  Environment Variables
+# ============================
+.env
+.env.production
+.env.development
+
+# ============================
+#  Logs
+# ============================
+*.log
+logs/
+*.bak
+
+# ============================
+#  Build / Packaging
+# ============================
+dist/
+build/
+
+# ============================
+#  Jupyter / Notebook Files
+# ============================
+*.ipynb_checkpoints/
+.ipynb_checkpoints/
+
+# ============================
+#  IDE / Editor Files
+# ============================
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains (PyCharm)
+.idea/
+
+# ============================
+#  OS-specific (Windows)
+# ============================
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ============================
+#  Misc
+# ============================
+.DS_Store
