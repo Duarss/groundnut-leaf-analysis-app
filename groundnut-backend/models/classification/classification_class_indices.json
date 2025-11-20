@@ -1,0 +1,7 @@
+{
+  "ALTERNARIA LEAF SPOT": 0,
+  "HEALTHY": 1,
+  "LEAF SPOT (EARLY AND LATE)": 2,
+  "ROSETTE": 3,
+  "RUST": 4
+}
