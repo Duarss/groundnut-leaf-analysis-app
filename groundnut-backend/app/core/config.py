@@ -4,7 +4,6 @@ import os
 # BASE_DIR = folder groundnut-backend
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
-
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 
