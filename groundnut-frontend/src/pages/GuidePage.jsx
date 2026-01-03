@@ -38,8 +38,15 @@ const GuidePage = () => {
 
         <Card title="Tips Pengambilan Gambar">
           <ul className="guide-tips">
-            <li>Gunakan pencahayaan alami yang cukup, hindari backlight keras.</li>
-            <li>Usahakan hanya satu daun utama yang menjadi fokus.</li>
+            <li>
+              Gunakan pencahayaan alami yang cukup, hindari backlight keras.
+            </li>
+            <li>
+              Usahakan hanya satu tanaman utama yang menjadi fokus.
+            </li>
+            <li>
+              Usahakan hanya satu jenis gejala penyakit pada daun yang difoto.
+            </li>
             <li>
               Pegang kamera sejajar dengan daun, jangan terlalu miring agar
               bentuk daun tidak terdistorsi.
