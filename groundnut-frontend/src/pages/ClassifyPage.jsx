@@ -114,12 +114,14 @@ const ClassifyPage = () => {
 
               {result.probs && (
                 <div className="prob-list">
-                  {Object.entries(result.probs).map(([cls, p]) => (
-                    <div key={cls} className="prob-row">
-                      <span>{cls}</span>
-                      <span>{(p * 100).toFixed(1)}%</span>
-                    </div>
-                  ))}
+                  {Object.entries(result.probs)
+                    .sort((a, b) => b[1] - a[1])  // DESC by probability
+                    .map(([cls, p]) => (
+                      <div key={cls} className="prob-row">
+                        <span>{cls}</span>
+                        <span>{(p * 100).toFixed(1)}%</span>
+                      </div>
+                    ))}
                 </div>
               )}
 
