@@ -14,7 +14,7 @@ from app.core.config import Config
 _model = None
 
 def _load_best_tuned_cfg():
-    path = Config.BEST_TUNED_CFG_PATH
+    path = Config.BEST_CLSF_TUNED_CFG_PATH
     if not path or not os.path.exists(path):
         raise FileNotFoundError(
             f"best_tuned_cfg.json not found. Expected at: {path}. "
@@ -64,7 +64,7 @@ def _apply_head(x, head_cfg, num_classes):
 
 
 def build_classification_model():
-    img_size = (Config.IMG_HEIGHT, Config.IMG_WIDTH)
+    img_size = (Config.CLSF_IMG_H, Config.CLSF_IMG_W)
     cfg = _load_best_tuned_cfg()
 
     base = EfficientNetB4(
@@ -72,7 +72,7 @@ def build_classification_model():
         include_top=False,
         input_shape=(img_size[0], img_size[1], 3),
     )
-    out = _apply_head(base.output, cfg["head"], Config.NUM_CLASSES)
+    out = _apply_head(base.output, cfg["head"], Config.CLSF_NUM_CLASSES)
     model = Model(inputs=base.input, outputs=out, name="EffNetB4_Classifier")
     return model
 
@@ -81,6 +81,6 @@ def get_classification_model():
     global _model
     if _model is None:
         model = build_classification_model()
-        model.load_weights(Config.BEST_WEIGHTS_PATH)
+        model.load_weights(Config.BEST_CLSF_WEIGHTS_PATH)
         _model = model
     return _model

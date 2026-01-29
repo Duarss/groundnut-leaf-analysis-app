@@ -1,0 +1,69 @@
+{
+  "selected_cfg": {
+    "mix_full_ratio": 1.0,
+    "lr": 7e-05,
+    "train_encoder": true,
+    "freeze_bn": true,
+    "tv_w": 0.1,
+    "bce_w": 0.9,
+    "tv_alpha": 0.1,
+    "tv_beta": 0.9,
+    "use_focal": true,
+    "bot_dropout": 0.0,
+    "dec_dropout": 0.0
+  },
+  "meta": {
+    "method": "random",
+    "objective": "minimize val_loss (short trials, early stopping)",
+    "tune_epochs": 15,
+    "tune_patience": 6,
+    "tune_batch_size": 4,
+    "tune_val_steps": 0,
+    "num_candidates": 31,
+    "constraints": {
+      "tv_w_plus_bce_w": "== 1.0 (enforced)",
+      "tv_alpha_plus_tv_beta": "== 1.0 (grid filtered; random resampled; normalized)"
+    },
+    "paths": {
+      "trials_csv": "models/segmentation\\tune_global4_random_trials.csv",
+      "best_json": "models/segmentation\\tune_global4_random_best.json",
+      "selected_json": "models/segmentation\\tune_global4_random_selected.json"
+    },
+    "gate": {
+      "rule": "select best_cfg only if val_loss(best_cfg) < val_loss(baseline_cfg)",
+      "baseline_trial": {
+        "val_loss": 0.06195914372801781,
+        "cfg": {
+          "mix_full_ratio": 0.8,
+          "lr": 3e-05,
+          "train_encoder": true,
+          "freeze_bn": true,
+          "tv_w": 0.2,
+          "bce_w": 0.8,
+          "tv_alpha": 0.3,
+          "tv_beta": 0.7,
+          "use_focal": true,
+          "bot_dropout": 0.06,
+          "dec_dropout": 0.04
+        }
+      },
+      "best_trial": {
+        "val_loss": 0.02986809052526951,
+        "cfg": {
+          "mix_full_ratio": 1.0,
+          "lr": 7e-05,
+          "train_encoder": true,
+          "freeze_bn": true,
+          "tv_w": 0.1,
+          "bce_w": 0.9,
+          "tv_alpha": 0.1,
+          "tv_beta": 0.9,
+          "use_focal": true,
+          "bot_dropout": 0.0,
+          "dec_dropout": 0.0
+        }
+      },
+      "selected": "best_cfg"
+    }
+  }
+}
