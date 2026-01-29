@@ -10,6 +10,12 @@ class Config:
     # Folder untuk model klasifikasi (sesuai struktur lama kamu)
     MODEL_DIR = os.path.join(BASE_DIR, "models", "classification")
 
+    # Path ke file best_tuned_cfg.json yang dihasilkan dari training hyperparameter tuning
+    BEST_TUNED_CFG_PATH = os.environ.get(
+        "BEST_TUNED_CFG_PATH",
+        os.path.join(MODEL_DIR, "best_tuned_cfg.json"),
+    )
+
     # Path ke weights EfficientNet-B4 yang sudah kamu latih
     BEST_WEIGHTS_PATH = os.environ.get(
         "CLASSIFICATION_WEIGHTS_PATH",

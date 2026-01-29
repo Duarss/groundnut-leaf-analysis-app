@@ -1,0 +1,16 @@
+{
+  "head": {
+    "head_type": "baseline",
+    "dense_units": 512,
+    "drop1": 0.5,
+    "drop2": 0.3,
+    "dense_l2": 0.0001,
+    "dense_units2": 256,
+    "drop3": 0.2
+  },
+  "schedule": {
+    "lr_phase1": 0.0003,
+    "lr_phase2": 3e-05,
+    "unfreeze_last_n_layers": 48
+  }
+}
