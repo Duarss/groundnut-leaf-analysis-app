@@ -1,9 +1,26 @@
 # app/services/segmentation_service.py
+import base64
+import os
+
+from app.core.config import Config
 from app.utils.temp_store import (
     read_meta, read_image_bytes, write_meta, is_expired, delete_bundle
 )
 from app.utils.image_io import load_image_for_segmentation
 from app.ml.segmentation.predict import predict_infected_areas
+
+def _write_overlay_png_to_tmp(analysis_id: str, overlay_b64: str) -> str:
+    """
+    Simpan overlay PNG (base64) ke tmp_uploads agar bisa di-persist saar klik Save.
+    """
+    if not overlay_b64:
+        return ValueError("overlay_png_base64 kosong.")
+    
+    os.makedirs(Config.TEMP_UPLOADS_DIR, exist_ok=True)
+    out_path = os.path.join(Config.TEMP_UPLOADS_DIR, f"{analysis_id}_overlay.png")
+    with open(out_path, "wb") as f:
+        f.write(base64.b64decode(overlay_b64))
+    return out_path
 
 def segment_infected_areas(analysis_id: str):
     meta = read_meta(analysis_id)
@@ -29,6 +46,12 @@ def segment_infected_areas(analysis_id: str):
     seg_batch = load_image_for_segmentation(img_bytes)
 
     seg_result = predict_infected_areas(seg_batch, label_norm)
+
+    if seg_result.get("enabled"):
+        overlay_b64 = seg_result.get("overlay_png_base64")
+        if overlay_b64:
+            overlay_path = _write_overlay_png_to_tmp(analysis_id, overlay_b64)
+            seg_result["overlay_path"] = overlay_path
 
     # simpan ke meta kalau enabled
     meta["stage"] = "segmented" if seg_result.get("enabled") else meta.get("stage", "classified")

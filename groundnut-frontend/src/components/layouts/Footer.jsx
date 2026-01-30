@@ -7,7 +7,7 @@ const Footer = () => {
   return (
     <footer className="footer">
       <div className="footer-inner">
-        <span>© {year} Peanut Leaf Disease Analyzer</span>
+        <span>© {year} Peanut Leaf Analyzer</span>
         <span>Universitas Surabaya</span>
         <span>TA - 160422035</span>
       </div>

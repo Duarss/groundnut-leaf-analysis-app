@@ -20,7 +20,7 @@ const Navbar = () => {
           <span className="brand-logo">🌱</span>
           <div className="brand-text">
             <div className="brand-title">Peanut Leaf Analyzer</div>
-            <div className="brand-subtitle">CNN + U-Net + Grad-CAM++</div>
+            <div className="brand-subtitle">Classify + Segment + Monitor</div>
           </div>
         </div>
 
