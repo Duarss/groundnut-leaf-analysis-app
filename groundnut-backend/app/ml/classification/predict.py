@@ -11,7 +11,7 @@ def _load_idx_to_class():
     Membaca classification_class_indices.json dan mengembalikan mapping:
       class_name -> idx, dan idx -> class_name
     """
-    with open(Config.CLASS_INDICES_PATH, "r") as f:
+    with open(Config.CLSF_CLASS_INDICES_PATH, "r") as f:
         class_indices = json.load(f)
     idx_to_class = {v: k for k, v in class_indices.items()}
     return class_indices, idx_to_class

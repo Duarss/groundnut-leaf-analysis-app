@@ -11,7 +11,7 @@ const dummyDetail = {
   mask_image_url: "/placeholder/mask2.png",
   overlay_image_url: "/placeholder/overlay2.png",
   gradcam_image_url: "/placeholder/gradcam2.png",
-  disease_label: "Rust",
+  label: "Rust",
   severity_percent: 61.2,
   severity_level: "Berat",
   created_at: "2025-11-18 16:02",
@@ -76,7 +76,7 @@ const HistoryDetailPage = () => {
       <div className="analysis-top-meta">
         <span>ID: {detail.id}</span>
         <span>Waktu: {detail.created_at}</span>
-        <span>Penyakit: {detail.disease_label}</span>
+        <span>Penyakit: {detail.label}</span>
       </div>
 
       <div className="grid-two">

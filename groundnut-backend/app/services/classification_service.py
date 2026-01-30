@@ -1,5 +1,6 @@
 # app/services/classification_service.py
 import uuid
+import numpy as np
 from app.utils.temp_store import write_temp_image, write_meta
 from app.utils.image_io import load_image_for_classification
 from app.ml.classification.predict import predict_leaf_class

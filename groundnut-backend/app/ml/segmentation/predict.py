@@ -1,5 +1,6 @@
 # app/ml/segmentation/predict.py
 import base64
+from cProfile import label
 import io
 import numpy as np
 from PIL import Image
@@ -27,19 +28,19 @@ def _mask_to_rgba(mask01, color=(255, 0, 0), alpha=110):
     return np.stack([r, g, b, a], axis=-1)
 
 
-def predict_infected_areas(seg_batch_01, disease_label: str, thr=None, overlay_alpha=None):
-    if str(disease_label) in HEALTHY_ALIASES:
+def predict_infected_areas(seg_batch_01, label: str, thr=None, overlay_alpha=None):
+    if str(label) in HEALTHY_ALIASES:
         return {"enabled": False, "reason": "Healthy -> tidak lanjut segmentasi"}
 
-    if disease_label not in CLASS_TO_INDEX:
-        return {"enabled": False, "reason": f"Label '{disease_label}' bukan 4 kelas segmentasi"}
+    if label not in CLASS_TO_INDEX:
+        return {"enabled": False, "reason": f"Label '{label}' bukan 4 kelas segmentasi"}
 
     model = get_segmentation_model()
     pred = model.predict(seg_batch_01, verbose=0)[0]  # (H,W,4)
 
-    ci = int(CLASS_TO_INDEX[disease_label])
+    ci = int(CLASS_TO_INDEX[label])
     prob = pred[..., ci]
-    thr = float(Config.SEG_THR if thr is None else thr)
+    thr = float(Config.SEG_MASK_THRESHOLD if thr is None else thr)
 
     bin_mask = (prob >= thr).astype(np.float32)
 
@@ -57,7 +58,7 @@ def predict_infected_areas(seg_batch_01, disease_label: str, thr=None, overlay_a
 
     return {
         "enabled": True,
-        "disease_label": disease_label,
+        "label": label,
         "channel_index": ci,
         "threshold": thr,
         "overlay_png_base64": overlay_b64,

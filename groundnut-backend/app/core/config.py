@@ -67,3 +67,6 @@ class Config:
 
     # Threshold binarisasi mask output segmentasi
     SEG_MASK_THRESHOLD = float(os.environ.get("SEG_MASK_THRESHOLD", 0.5))
+
+    # Overlay hasil prediksi mask
+    SEG_OVERLAY_ALPHA = float(os.environ.get("SEG_OVERLAY_ALPHA", 0.45))

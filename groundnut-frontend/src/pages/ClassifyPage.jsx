@@ -3,7 +3,18 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { analyzeImage } from "../api/analysisApi";
+import { classifyImage } from "../api/analysisApi";
+
+const _sessionKey = (analysisId) => `analysis_session_${analysisId}`;
+
+function _fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Gagal membaca file gambar."));
+    reader.readAsDataURL(file);
+  });
+}
 
 const ClassifyPage = () => {
   const [file, setFile] = useState(null);
@@ -34,9 +45,26 @@ const ClassifyPage = () => {
     setResult(null);
 
     try {
-      const data = await analyzeImage(file);
-      // Expect structure from backend: { id, disease_label, confidence, probs }
+      const data = await classifyImage(file);
+      // Expect structure from backend: { id, label, confidence, probs }
       setResult(data);
+
+      // Simpan sementara agar tahap segmentasi tidak perlu upload ulang
+      try {
+        const originalDataUrl = await _fileToDataUrl(file);
+        sessionStorage.setItem(
+          _sessionKey(data.analysis_id),
+          JSON.stringify({
+            analysis_id: data.analysis_id,
+            label: data.label,
+            confidence: data.confidence,
+            probs: data.probs,
+            originalDataUrl,
+          })
+        );
+      } catch (e) {
+        void e;
+      }
     } catch (err) {
       setError(err.message || "Terjadi kesalahan saat klasifikasi.");
     } finally {
@@ -44,10 +72,11 @@ const ClassifyPage = () => {
     }
   };
 
-  const handleGoToAnalysis = () => {
-    if (!result?.id) return;
-    // Nanti halaman /analysis/:id akan pakai id ini
-    navigate(`/analysis/${result.id}`);
+  const handleGoToSegment = () => {
+    const analysisId = result?.analysis_id || result?.id;
+    if (!analysisId) return;
+    // Nanti halaman /segment/:id akan pakai id ini
+    navigate(`/segment/${analysisId}`);
   };
 
   return (
@@ -63,15 +92,9 @@ const ClassifyPage = () => {
         <Card title="Unggah Citra" subtitle="Langkah 1 dari 2">
           <form onSubmit={handleSubmit} className="upload-form">
             <label className="upload-box">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-              />
+              <input type="file" accept="image/*" onChange={handleFileChange} />
               <span>
-                {file
-                  ? "Ganti file citra"
-                  : "Klik untuk memilih atau drop file di sini"}
+                {file ? "Ganti file citra" : "Klik untuk memilih atau drop file di sini"}
               </span>
             </label>
 
@@ -89,10 +112,7 @@ const ClassifyPage = () => {
           </form>
         </Card>
 
-        <Card
-          title="Hasil Klasifikasi"
-          subtitle="Prediksi penyakit berdasarkan model CNN"
-        >
+        <Card title="Hasil Klasifikasi" subtitle="Prediksi penyakit berdasarkan model CNN">
           {!result && !isLoading && (
             <p className="placeholder">
               Hasil prediksi akan muncul di sini setelah kamu mengunggah citra
@@ -100,22 +120,19 @@ const ClassifyPage = () => {
             </p>
           )}
 
-          {isLoading && (
-            <p className="placeholder">Model sedang memproses citra...</p>
-          )}
+          {isLoading && <p className="placeholder">Model sedang memproses citra...</p>}
 
           {result && !isLoading && (
             <div className="result-block">
-              <h3 className="result-label">{result.disease_label}</h3>
+              <h3 className="result-label">{result.label}</h3>
               <p>
-                Keyakinan model:{" "}
-                <b>{(result.confidence * 100).toFixed(1)}%</b>
+                Keyakinan model: <b>{(result.confidence * 100).toFixed(1)}%</b>
               </p>
 
               {result.probs && (
                 <div className="prob-list">
                   {Object.entries(result.probs)
-                    .sort((a, b) => b[1] - a[1])  // DESC by probability
+                    .sort((a, b) => b[1] - a[1])
                     .map(([cls, p]) => (
                       <div key={cls} className="prob-row">
                         <span>{cls}</span>
@@ -126,8 +143,8 @@ const ClassifyPage = () => {
               )}
 
               <div className="result-actions">
-                <Button onClick={handleGoToAnalysis}>
-                  Lihat Segmentasi & Keparahan
+                <Button onClick={handleGoToSegment}>
+                  Lihat Segmentasi
                 </Button>
               </div>
             </div>

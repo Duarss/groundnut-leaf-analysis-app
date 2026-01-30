@@ -28,7 +28,6 @@ DEC_DROPOUT = 0.0
 
 _model = None
 
-
 def _set_dropout_globals(cfg: dict):
     global BOT_DROPOUT, DEC_DROPOUT
     BOT_DROPOUT = float(cfg.get("bot_dropout", 0.0))

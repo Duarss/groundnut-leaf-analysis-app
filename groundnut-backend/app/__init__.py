@@ -2,7 +2,7 @@
 from flask import Flask
 from flask_cors import CORS
 from .core.config import Config
-from .api.analyze_routes import analyze_bp
+from .api.analyze_routes import bp
 
 
 def create_app():
@@ -13,6 +13,6 @@ def create_app():
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
     # Register blueprint untuk klasifikasi
-    app.register_blueprint(analyze_bp, url_prefix="/api")
+    app.register_blueprint(bp, url_prefix="/api")
 
     return app

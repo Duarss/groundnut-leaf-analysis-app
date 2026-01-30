@@ -7,14 +7,14 @@ import Card from "../components/ui/Card";
 const dummyHistory = [
   {
     id: "dummy-123",
-    disease_label: "Leaf Spot (Early)",
+    label: "Leaf Spot (Early)",
     severity_level: "Sedang",
     severity_percent: 37.5,
     created_at: "2025-11-19 10:15",
   },
   {
     id: "dummy-124",
-    disease_label: "Rust",
+    label: "Rust",
     severity_level: "Berat",
     severity_percent: 61.2,
     created_at: "2025-11-18 16:02",
@@ -77,7 +77,7 @@ const HistoryPage = () => {
                 {items.map((row) => (
                   <tr key={row.id}>
                     <td>{row.created_at}</td>
-                    <td>{row.disease_label}</td>
+                    <td>{row.label}</td>
                     <td>{row.severity_level}</td>
                     <td>{row.severity_percent.toFixed(1)}%</td>
                     <td>

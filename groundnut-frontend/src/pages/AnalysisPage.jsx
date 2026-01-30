@@ -11,7 +11,7 @@ const dummyDetail = {
   mask_image_url: "/placeholder/mask.png",
   overlay_image_url: "/placeholder/overlay.png",
   gradcam_image_url: "/placeholder/gradcam.png",
-  disease_label: "Leaf Spot (Early)",
+  label: "Leaf Spot (Early)",
   severity_percent: 37.5,
   severity_level: "Sedang",
   created_at: "2025-11-19 10:15",
@@ -71,7 +71,7 @@ const AnalysisPage = () => {
       <div className="analysis-top-meta">
         <span>ID Analisis: {detail.id}</span>
         <span>Waktu: {detail.created_at}</span>
-        <span>Penyakit: {detail.disease_label}</span>
+        <span>Penyakit: {detail.label}</span>
       </div>
 
       <div className="grid-three">
