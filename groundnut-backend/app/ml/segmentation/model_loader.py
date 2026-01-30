@@ -95,7 +95,7 @@ def build_unet_efficientnetb0(net_h, net_w, out_channels=4, train_encoder=False)
 
 
 def load_selected_cfg():
-    with open(Config.BEST_CLSF_TUNED_CFG_PATH, encoding="utf-8") as f:
+    with open(Config.BEST_SEG_TUNED_CFG_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
