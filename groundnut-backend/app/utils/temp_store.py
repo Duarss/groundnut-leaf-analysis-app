@@ -66,12 +66,45 @@ def read_image_bytes(analysis_id: str) -> bytes:
         return f.read()
 
 def delete_bundle(analysis_id: str):
-    # hapus meta + image + mask (kalau ada)
-    for p in glob.glob(os.path.join(Config.TEMP_DIR, f"{analysis_id}*")):
-        try:
-            os.remove(p)
-        except Exception:
-            pass
+    """
+    Hapus semua file terkait analysis_id di TEMP_DIR.
+    Dibuat retry karena di Windows kadang file masih 'locked' sebentar.
+    """
+    import time
+    import glob
+    import os
+
+    pattern = os.path.join(Config.TEMP_DIR, f"{analysis_id}*")
+    paths = glob.glob(pattern)
+
+    failed = []
+    for p in paths:
+        # retry beberapa kali
+        ok = False
+        for _ in range(6):  # ~ total 0.6-1.2 detik
+            try:
+                if os.path.isdir(p):
+                    # kalau ada folder (jarang), hapus folder
+                    import shutil
+                    shutil.rmtree(p, ignore_errors=False)
+                else:
+                    os.remove(p)
+                ok = True
+                break
+            except PermissionError:
+                time.sleep(0.2)
+            except FileNotFoundError:
+                ok = True
+                break
+            except Exception:
+                time.sleep(0.2)
+
+        if not ok:
+            failed.append(p)
+
+    if failed:
+        # jangan disilent lagi, biar ketahuan di console/log
+        raise RuntimeError(f"Gagal menghapus temp files: {failed}")
 
 def cleanup_expired():
     """

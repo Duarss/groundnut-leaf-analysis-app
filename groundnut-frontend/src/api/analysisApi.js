@@ -62,3 +62,22 @@ export async function segmentImage(analysisId) {
 
   return res.json();
 }
+
+// ================================
+// SAVE ANALYSIS
+// ================================
+// Expected backend response:
+//  - { saved: true, analysis_id, orig_image_path, seg_enabled, seg_overlay_path }
+export async function saveAnalysis(analysisId) {
+  const res = await fetch("/api/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ analysis_id: analysisId }),
+  });
+
+  if (!res.ok) {
+    throw new Error(await _parseError(res, "Gagal menyimpan hasil analisis."));
+  }
+
+  return res.json();
+}

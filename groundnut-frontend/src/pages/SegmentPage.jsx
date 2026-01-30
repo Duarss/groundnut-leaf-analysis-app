@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { segmentImage } from "../api/analysisApi";
+import { segmentImage, saveAnalysis } from "../api/analysisApi";
 
 // sessionStorage keys
 const _key = (analysisId) => `analysis_session_${analysisId}`;
@@ -27,6 +27,7 @@ const SegmentPage = () => {
   const [overlaySrc, setOverlaySrc] = useState("");
   const [maskSrc, setMaskSrc] = useState("");
   const [meta, setMeta] = useState(null);
+  const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
 
   const cached = useMemo(() => {
     if (!analysisId) return null;
@@ -80,6 +81,18 @@ const SegmentPage = () => {
   };
 
   const handleBack = () => navigate("/classify");
+
+  const handleSave = async () => {
+    if (!analysisId) return;
+    setSaveStatus({ loading: true, msg: "", err: "" });
+    try {
+      const res = await saveAnalysis(analysisId);
+      if (!res?.saved) throw new Error(res?.error || "Gagal menyimpan hasil analisis.");
+      setSaveStatus({ loading: false, msg: "Hasil analisis berhasil disimpan.", err: "" });
+    } catch (e) {
+      setSaveStatus({ loading: false, msg: "", err: e.message || "Gagal menyimpan." });
+    }
+  };
 
   return (
     <div className="page page-analysis">
@@ -162,24 +175,20 @@ const SegmentPage = () => {
         </p>
       )}
 
-      <div
-        className="result-actions"
-        style={{
-          marginTop: 16,
-          gap: 12,
-          display: "flex",
-          flexWrap: "wrap",
-        }}
-      >
-        <Button
-          onClick={handleRunSegmentation}
-          disabled={isLoading || !analysisId}
-        >
+      <div className="result-actions" style={{ marginTop: 16, gap: 12, display: "flex", flexWrap: "wrap" }}>
+        <Button onClick={handleRunSegmentation} disabled={isLoading || !analysisId}>
           {isLoading ? "Memproses..." : "Proses Segmentasi"}
         </Button>
+
         <Button onClick={handleBack} type="button">
           Kembali
         </Button>
+
+        {overlaySrc && (
+          <Button onClick={handleSave} disabled={saveStatus.loading} type="button">
+            {saveStatus.loading ? "Menyimpan..." : "Simpan Hasil"}
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -16,8 +16,8 @@ def _write_overlay_png_to_tmp(analysis_id: str, overlay_b64: str) -> str:
     if not overlay_b64:
         return ValueError("overlay_png_base64 kosong.")
     
-    os.makedirs(Config.TEMP_UPLOADS_DIR, exist_ok=True)
-    out_path = os.path.join(Config.TEMP_UPLOADS_DIR, f"{analysis_id}_overlay.png")
+    os.makedirs(Config.TEMP_DIR, exist_ok=True)
+    out_path = os.path.join(Config.TEMP_DIR, f"{analysis_id}_overlay.png")
     with open(out_path, "wb") as f:
         f.write(base64.b64decode(overlay_b64))
     return out_path

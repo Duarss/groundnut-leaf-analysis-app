@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { classifyImage } from "../api/analysisApi";
+import { classifyImage, saveAnalysis } from "../api/analysisApi";
 
 const _sessionKey = (analysisId) => `analysis_session_${analysisId}`;
 
@@ -22,6 +22,7 @@ const ClassifyPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
   const navigate = useNavigate();
 
   const handleFileChange = (e) => {
@@ -77,6 +78,20 @@ const ClassifyPage = () => {
     if (!analysisId) return;
     // Nanti halaman /segment/:id akan pakai id ini
     navigate(`/segment/${analysisId}`);
+  };
+
+  const handleSave = async () => {
+    const analysisId = result?.analysis_id || result?.id;
+    if (!analysisId) return;
+
+    setSaveStatus({ loading: true, msg: "", err: "" });
+    try {
+      const res = await saveAnalysis(analysisId);
+      if (!res?.saved) throw new Error(res?.error || "Gagal menyimpan hasil analisis.");
+      setSaveStatus({ loading: false, msg: "Hasil analisis berhasil disimpan.", err: "" });
+    } catch (e) {
+      setSaveStatus({ loading: false, msg: "", err: e.message || "Gagal menyimpan hasil analisis." });
+    }
   };
 
   return (
@@ -143,9 +158,17 @@ const ClassifyPage = () => {
               )}
 
               <div className="result-actions">
-                <Button onClick={handleGoToSegment}>
-                  Lihat Segmentasi
-                </Button>
+                {String(result.label || "").trim().toLowerCase() === "healthy" ? (
+                  <>
+                    <Button onClick={handleSave} disabled={saveStatus.loading}>
+                      {saveStatus.loading ? "Menyimpan..." : "Simpan Hasil"}
+                    </Button>
+                    {saveStatus.msg && <p className="success-text">{saveStatus.msg}</p>}
+                    {saveStatus.err && <p className="error-text">{saveStatus.err}</p>}
+                  </>
+                ) : (
+                  <Button onClick={handleGoToSegment}>Lihat Segmentasi</Button>
+                )}
               </div>
             </div>
           )}

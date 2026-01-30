@@ -9,7 +9,7 @@ from app.models.analysis_result import AnalysisResult
 from app.core.config import Config
 
 
-def save_analysis(analysis_id: str, delete_temp_after: bool = False) -> dict:
+def save_analysis(analysis_id: str, delete_temp_after: bool | None = None) -> dict:
     """
     Save hasil final analisis:
     - Ambil meta JSON dari temp_store
@@ -32,8 +32,7 @@ def save_analysis(analysis_id: str, delete_temp_after: bool = False) -> dict:
     if not orig_tmp_path:
         raise FileNotFoundError("File gambar original tidak ditemukan di tmp_uploads.")
 
-    # copy original → storage permanen
-    # suffix: pakai ekstensi dari tmp
+    # original image
     ext = orig_tmp_path.rsplit(".", 1)[-1].lower()
     orig_saved_path = persist_file(orig_tmp_path, analysis_id, f"orig.{ext}")
 
@@ -73,6 +72,9 @@ def save_analysis(analysis_id: str, delete_temp_after: bool = False) -> dict:
     if delete_temp_after:
         from app.utils.temp_store import delete_bundle
         delete_bundle(analysis_id)
+
+    if delete_temp_after is None:
+        delete_temp_after = bool(Config.TEMP_DELETE_AFTER_SEG)
 
     return {
         "saved": True,

@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 # Load .env sekali di awal aplikasi
 load_dotenv()
 
+def _env_bool(name: str, default: str = "0") -> bool:
+    v = str(os.environ.get(name, default)).strip().lower()
+    return v in ("1", "true", "yes", "y", "on")
 
 class Config:
     # =========================
@@ -24,7 +27,7 @@ class Config:
     )
 
     TEMP_TTL_SECONDS = int(os.environ.get("TEMP_TTL_SECONDS", 600))  # 10 menit
-    TEMP_DELETE_AFTER_SEG = bool(int(os.environ.get("TEMP_DELETE_AFTER_SEG", "0")))
+    TEMP_DELETE_AFTER_SEG = _env_bool("TEMP_DELETE_AFTER_SEG", "0")
 
     # Folder untuk simpan hasil permanen
     STORAGE_DIR = os.environ.get("STORAGE_DIR", os.path.join(BASE_DIR, "storage"))
