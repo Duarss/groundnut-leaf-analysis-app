@@ -1,0 +1,17 @@
+{
+  "base_filters": 8,
+  "depth": 4,
+  "use_bn": false,
+  "dropout": 0.0,
+  "sep_conv": false,
+  "lr": 0.001,
+  "optimizer": "adam",
+  "img_h": 480,
+  "img_w": 640,
+  "batch_size": 1,
+  "objective": "val_loss",
+  "best_val_loss": 0.09127634018659592,
+  "best_val_dice50": 0.9583130478858948,
+  "best_val_iou50": 0.9199625849723816,
+  "seed": 42
+}

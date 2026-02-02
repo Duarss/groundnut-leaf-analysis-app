@@ -19,3 +19,7 @@ class AnalysisResult(Base):
     # segmentation (optional)
     seg_enabled = Column(Boolean, nullable=False, default=False)
     seg_overlay_path = Column(Text, nullable=True)
+
+    # severity (optional, hanya kalau segmentasi jalan)
+    severity_pct = Column(Float, nullable=True)
+    severity_fao_level = Column(Integer, nullable=True)

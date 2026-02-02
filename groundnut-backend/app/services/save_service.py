@@ -1,5 +1,6 @@
 # app/services/save_service.py
 import json
+import time
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.utils.temp_store import read_meta, find_image_path
@@ -9,13 +10,27 @@ from app.models.analysis_result import AnalysisResult
 from app.core.config import Config
 
 
+def _safe_float(x):
+    try:
+        return float(x)
+    except Exception:
+        return None
+
+
+def _safe_int(x):
+    try:
+        return int(x)
+    except Exception:
+        return None
+
+
 def save_analysis(analysis_id: str, delete_temp_after: bool | None = None) -> dict:
     """
     Save hasil final analisis:
-    - Ambil meta JSON dari temp_store
+    - Ambil meta JSON dari tmp_uploads
     - Copy original image (wajib) ke storage permanen
-    - Copy overlay (opsional, jika ada dan segmentasi dilakukan)
-    - Insert 1 row ke analysis_results
+    - Copy overlay (opsional, jika segmentasi dilakukan)
+    - Simpan 1 row ke analysis_results termasuk severity (opsional)
     """
     meta = read_meta(analysis_id)
 
@@ -36,8 +51,7 @@ def save_analysis(analysis_id: str, delete_temp_after: bool | None = None) -> di
     ext = orig_tmp_path.rsplit(".", 1)[-1].lower()
     orig_saved_path = persist_file(orig_tmp_path, analysis_id, f"orig.{ext}")
 
-    # overlay opsional: tergantung flow segmentasi kamu
-    # asumsikan meta["segmentation"]["overlay_path"] menyimpan path file overlay di tmp_uploads
+    # segmentation
     seg = meta.get("segmentation") or {}
     overlay_tmp_path = seg.get("overlay_path")  # boleh None
     seg_enabled = bool(seg.get("enabled", False))
@@ -46,18 +60,37 @@ def save_analysis(analysis_id: str, delete_temp_after: bool | None = None) -> di
     if seg_enabled and overlay_tmp_path:
         overlay_saved_path = persist_file(overlay_tmp_path, analysis_id, "overlay.png")
 
+    # severity (opsional)
+    sev = seg.get("severity") or {}
+    severity_pct = _safe_float(sev.get("severity_pct"))
+    # suport beberapa kemungkinan struktur:
+    # 1) sev["fao"]["level"]
+    # 2) sev["fao_level"]
+    fao = sev.get("fao") or {}
+    severity_level = _safe_int(fao.get("level"))
+    if severity_level is None:
+        severity_level = _safe_int(sev.get("fao_level"))
+
+    # default delete_temp_after pakai env kalau None
+    if delete_temp_after is None:
+        delete_temp_after = bool(getattr(Config, "TEMP_DELETE_AFTER_SEG", False))
+
     # insert DB
     db = SessionLocal()
     try:
         row = AnalysisResult(
             analysis_id=analysis_id,
-            created_at=int(meta.get("created_at", 0)) or int(__import__("time").time()),
+            created_at=int(meta.get("created_at", 0)) or int(time.time()),
             orig_image_path=orig_saved_path,
             label=str(label),
-            confidence=float(conf) if conf is not None else None,
+            confidence=_safe_float(conf),
             probs_json=json.dumps(probs, ensure_ascii=False) if probs is not None else None,
             seg_enabled=bool(seg_enabled),
             seg_overlay_path=overlay_saved_path,
+
+            # severity
+            severity_pct=severity_pct,
+            severity_fao_level=severity_level,
         )
         db.add(row)
         db.commit()
@@ -68,13 +101,10 @@ def save_analysis(analysis_id: str, delete_temp_after: bool | None = None) -> di
     finally:
         db.close()
 
-    # opsional: bersihkan tmp (kalau kamu mau)
+    # bersihkan tmp bila diminta
     if delete_temp_after:
         from app.utils.temp_store import delete_bundle
         delete_bundle(analysis_id)
-
-    if delete_temp_after is None:
-        delete_temp_after = bool(Config.TEMP_DELETE_AFTER_SEG)
 
     return {
         "saved": True,
@@ -82,4 +112,6 @@ def save_analysis(analysis_id: str, delete_temp_after: bool | None = None) -> di
         "orig_image_path": orig_saved_path,
         "seg_enabled": seg_enabled,
         "seg_overlay_path": overlay_saved_path,
+        "severity_pct": severity_pct,
+        "severity_fao_level": severity_level,
     }
