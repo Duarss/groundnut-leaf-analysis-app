@@ -143,38 +143,11 @@ def history_list():
     
 @bp.route("/history/<analysis_id>", methods=["GET"])
 def history_detail(analysis_id):
-    """
-    GET /api/history/<analysis_id>
-    Header: X-Client-Id: <id>
-    """
-    cid = _get_client_id()
-    if not cid:
-        return jsonify({"error": "client_id wajib (untuk multi-user tanpa login)."}), 400
-
     try:
-        row = get_history_detail(client_id=cid, analysis_id=analysis_id)
-        if not row:
-            return jsonify({"error": "Data tidak ditemukan"}), 404
-
-        # row bisa ORM atau dict
-        if isinstance(row, dict):
-            if "created_at" in row:
-                row["created_at"] = _to_iso(row["created_at"])
-            return jsonify(row), 200
-
-        return jsonify({
-            "analysis_id": row.analysis_id,
-            "client_id": row.client_id,
-            "created_at": _to_iso(row.created_at),
-            "orig_image_path": row.orig_image_path,
-            "label": row.label,
-            "confidence": row.confidence,
-            "probs_json": row.probs_json,
-            "seg_enabled": row.seg_enabled,
-            "seg_overlay_path": row.seg_overlay_path,
-            "severity_pct": row.severity_pct,
-            "severity_fao_level": row.severity_fao_level,
-        }), 200
-
+        client_id = _get_client_id()  # <-- INI yang sering lupa
+        detail = get_history_detail(analysis_id, client_id)
+        if not detail:
+            return {"error": "History tidak ditemukan"}, 404
+        return detail, 200
     except Exception as e:
-        return jsonify({"error": "Gagal mengambil detail history", "detail": str(e)}), 500
+        return {"error": "Gagal mengambil detail history", "detail": str(e)}, 500

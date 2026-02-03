@@ -5,8 +5,10 @@ from pathlib import PurePosixPath
 
 from app.core.config import Config
 
+
 def ensure_storage_dir():
     os.makedirs(Config.STORAGE_ANALYSIS_DIR, exist_ok=True)
+
 
 def ensure_analysis_dir(client_id: str, analysis_id: str) -> str:
     """
@@ -17,17 +19,18 @@ def ensure_analysis_dir(client_id: str, analysis_id: str) -> str:
     os.makedirs(d, exist_ok=True)
     return d
 
+
 def persist_file(src_path: str, client_id: str, analysis_id: str, filename: str) -> str:
     """
-    Copy file dari tmp_uploads -> storage permanen
-    return: path RELATIF terhadap STORAGE_ANALYSIS_DIR/<client_id>
-            contoh: "<analysis_id>/orig.jpg"
+    Copy file dari tmp_uploads -> storage permanen.
+
+    return: path RELATIF terhadap Config.STORAGE_ANALYSIS_DIR
+            contoh: "<client_id>/<analysis_id>/orig.jpeg"
+    NOTE: sengaja pakai POSIX path ('/') agar aman untuk URL di browser
+    walaupun backend berjalan di Windows.
     """
     analysis_dir = ensure_analysis_dir(client_id, analysis_id)
     dst = os.path.join(analysis_dir, filename)
     shutil.copy2(src_path, dst)
 
-    # return path relatif supaya gampang dipakai HistoryDetailPage.
-    # WAJIB pakai slash '/' agar aman dipakai sebagai URL path di browser,
-    # meskipun backend jalan di Windows.
-    return str(PurePosixPath(str(analysis_id)) / filename)
+    return str(PurePosixPath(str(client_id)) / str(analysis_id) / filename)

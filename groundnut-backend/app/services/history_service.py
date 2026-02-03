@@ -34,15 +34,36 @@ def list_history(client_id: str, limit: int = 50, offset: int = 0):
         db.close()
 
 
-def get_history_detail(client_id: str, analysis_id: str):
+def get_history_detail(analysis_id: str, client_id: str) -> dict:
+    """
+    WAJIB: client_id dikirim dari route (jangan pakai variable global / undefined).
+    """
+    if not client_id:
+        raise ValueError("client_id wajib")
+
     db = SessionLocal()
     try:
         row = (
             db.query(AnalysisResult)
-            .filter(AnalysisResult.client_id == client_id)
             .filter(AnalysisResult.analysis_id == analysis_id)
+            .filter(AnalysisResult.client_id == client_id)
             .first()
         )
-        return row
+        if not row:
+            return None
+
+        return {
+            "analysis_id": row.analysis_id,
+            "client_id": row.client_id,
+            "confidence": row.confidence,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "label": row.label,
+            "orig_image_path": row.orig_image_path,
+            "probs_json": row.probs_json,
+            "seg_enabled": row.seg_enabled,
+            "seg_overlay_path": row.seg_overlay_path,
+            "severity_fao_level": row.severity_fao_level,
+            "severity_pct": row.severity_pct,
+        }
     finally:
         db.close()

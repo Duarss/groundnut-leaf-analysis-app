@@ -29,6 +29,9 @@ def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | No
     """
     Save hasil final analisis:
     - client_id WAJIB dikirim dari route (jangan ambil dari request di service)
+
+    Perubahan: orig_image_path & seg_overlay_path sekarang disimpan lengkap:
+      "<client_id>/<analysis_id>/<filename>"
     """
     client_id = (str(client_id).strip() if client_id is not None else "")
     if not client_id:

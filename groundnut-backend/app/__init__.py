@@ -15,6 +15,6 @@ def create_app():
 
     # Register blueprint untuk klasifikasi
     app.register_blueprint(bp, url_prefix="/api")
-    app.register_blueprint(storage_bp, url_prefix="/api/storage")
+    app.register_blueprint(storage_bp, url_prefix="/api")
 
     return app
