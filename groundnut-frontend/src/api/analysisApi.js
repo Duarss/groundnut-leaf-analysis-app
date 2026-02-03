@@ -1,4 +1,7 @@
 // src/api/analysisApi.js
+import { getClientId } from "../utils/clientId";
+
+// const API_BASE = import.meta.env.VITE_API_BASE;
 
 async function _parseError(res, fallbackMsg) {
   let msg = fallbackMsg;
@@ -22,7 +25,7 @@ export async function classifyImage(file) {
   const formData = new FormData();
   formData.append("image", file);
 
-  const res = await fetch("/api/classify", {
+  const res = await fetch(`/api/classify`, {
     method: "POST",
     body: formData,
   });
@@ -50,7 +53,7 @@ export async function classifyImage(file) {
 // Expected backend response (tolerant):
 //  - { analysis_id, overlay_png_base64, mask_png_base64?, meta? }
 export async function segmentImage(analysisId) {
-  const res = await fetch("/api/segment", {
+  const res = await fetch(`/api/segment`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ analysis_id: analysisId }),
@@ -67,17 +70,18 @@ export async function segmentImage(analysisId) {
 // SAVE ANALYSIS
 // ================================
 // Expected backend response:
-//  - { saved: true, analysis_id, orig_image_path, seg_enabled, seg_overlay_path }
-export async function saveAnalysis(analysisId) {
-  const res = await fetch("/api/save", {
+//  - { saved: true, analysis_id, client_id, orig_image_path, seg_enabled, seg_overlay_path }
+export async function saveAnalysis(analysisId, body = {}) {
+  const res = await fetch(`/api/save`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ analysis_id: analysisId }),
+    headers: {
+      "Content-Type": "application/json",
+      "X-Client-Id": getClientId(),
+    },
+    body: JSON.stringify({ analysis_id: analysisId, ...body }),
   });
 
-  if (!res.ok) {
-    throw new Error(await _parseError(res, "Gagal menyimpan hasil analisis."));
-  }
-
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || data?.detail || "Save gagal");
+  return data;
 }

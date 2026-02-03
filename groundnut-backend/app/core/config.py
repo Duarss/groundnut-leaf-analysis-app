@@ -27,7 +27,7 @@ class Config:
     )
 
     TEMP_TTL_SECONDS = int(os.environ.get("TEMP_TTL_SECONDS", 600))  # 10 menit
-    TEMP_DELETE_AFTER_SEG = _env_bool("TEMP_DELETE_AFTER_SEG", "0")
+    TEMP_DELETE_AFTER_SEG = _env_bool("TEMP_DELETE_AFTER_SEG", "1")
 
     # Folder untuk simpan hasil permanen
     STORAGE_DIR = os.environ.get("STORAGE_DIR", os.path.join(BASE_DIR, "storage"))

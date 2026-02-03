@@ -17,10 +17,12 @@ const Navbar = () => {
     <header className="navbar">
       <div className="navbar-inner">
         <div className="navbar-brand">
-          <span className="brand-logo">🌱</span>
+          <span className="brand-logo">
+            <img src="/src/assets/app-logo.svg" alt="App Logo" width="30" height="30" />
+          </span>
           <div className="brand-text">
             <div className="brand-title">Groundnut Leaf Analyzer</div>
-            <div className="brand-subtitle">Classify + Segment + Monitor</div>
+            <div className="brand-subtitle">Classify + Segment + Estimate Severity + Monitor</div>
           </div>
         </div>
 

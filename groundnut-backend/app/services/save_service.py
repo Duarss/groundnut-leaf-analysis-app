@@ -1,37 +1,39 @@
 # app/services/save_service.py
 import json
-import time
+from datetime import datetime, timezone
+
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.utils.temp_store import read_meta, find_image_path
+from app.utils.temp_store import read_meta, find_image_path, delete_bundle
 from app.utils.storage_io import persist_file
 from app.database.db import SessionLocal
 from app.models.analysis_result import AnalysisResult
 from app.core.config import Config
 
 
-def _safe_float(x):
+def _meta_created_at_dt(meta: dict) -> datetime:
+    """
+    meta["created_at"] sebelumnya epoch int.
+    DB sekarang pakai TIMESTAMP/DateTime.
+    """
+    v = meta.get("created_at", None)
     try:
-        return float(x)
+        if isinstance(v, (int, float)) and v > 0:
+            return datetime.fromtimestamp(float(v), tz=timezone.utc)
     except Exception:
-        return None
+        pass
+    return datetime.now(timezone.utc)
 
 
-def _safe_int(x):
-    try:
-        return int(x)
-    except Exception:
-        return None
-
-
-def save_analysis(analysis_id: str, delete_temp_after: bool | None = None) -> dict:
+def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | None = None) -> dict:
     """
     Save hasil final analisis:
-    - Ambil meta JSON dari tmp_uploads
-    - Copy original image (wajib) ke storage permanen
-    - Copy overlay (opsional, jika segmentasi dilakukan)
-    - Simpan 1 row ke analysis_results termasuk severity (opsional)
+    - client_id WAJIB dikirim dari route (jangan ambil dari request di service)
     """
+    client_id = (str(client_id).strip() if client_id is not None else "")
+    if not client_id:
+        raise ValueError("client_id wajib (untuk multi-user tanpa login).")
+
     meta = read_meta(analysis_id)
 
     cls = (meta.get("classification") or {})
@@ -47,68 +49,65 @@ def save_analysis(analysis_id: str, delete_temp_after: bool | None = None) -> di
     if not orig_tmp_path:
         raise FileNotFoundError("File gambar original tidak ditemukan di tmp_uploads.")
 
-    # original image
+    # original image (persist)
     ext = orig_tmp_path.rsplit(".", 1)[-1].lower()
-    orig_saved_path = persist_file(orig_tmp_path, analysis_id, f"orig.{ext}")
+    orig_saved_path = persist_file(orig_tmp_path, client_id, analysis_id, f"orig.{ext}")
 
-    # segmentation
+    # segmentation info
     seg = meta.get("segmentation") or {}
-    overlay_tmp_path = seg.get("overlay_path")  # boleh None
     seg_enabled = bool(seg.get("enabled", False))
 
+    overlay_tmp_path = seg.get("overlay_path")  # boleh None
     overlay_saved_path = None
     if seg_enabled and overlay_tmp_path:
-        overlay_saved_path = persist_file(overlay_tmp_path, analysis_id, "overlay.png")
+        overlay_saved_path = persist_file(overlay_tmp_path, client_id, analysis_id, "overlay.png")
 
-    # severity (opsional)
+    # severity info
     sev = seg.get("severity") or {}
-    severity_pct = _safe_float(sev.get("severity_pct"))
-    # suport beberapa kemungkinan struktur:
-    # 1) sev["fao"]["level"]
-    # 2) sev["fao_level"]
+    severity_pct = sev.get("severity_pct", None)
+
+    severity_level = None
     fao = sev.get("fao") or {}
-    severity_level = _safe_int(fao.get("level"))
-    if severity_level is None:
-        severity_level = _safe_int(sev.get("fao_level"))
+    if isinstance(fao, dict) and "level" in fao:
+        severity_level = fao.get("level")
 
-    # default delete_temp_after pakai env kalau None
-    if delete_temp_after is None:
-        delete_temp_after = bool(getattr(Config, "TEMP_DELETE_AFTER_SEG", False))
-
-    # insert DB
     db = SessionLocal()
     try:
         row = AnalysisResult(
             analysis_id=analysis_id,
-            created_at=int(meta.get("created_at", 0)) or int(time.time()),
+            created_at=_meta_created_at_dt(meta),
+            client_id=client_id,
+
             orig_image_path=orig_saved_path,
-            label=str(label),
-            confidence=_safe_float(conf),
-            probs_json=json.dumps(probs, ensure_ascii=False) if probs is not None else None,
-            seg_enabled=bool(seg_enabled),
             seg_overlay_path=overlay_saved_path,
 
-            # severity
-            severity_pct=severity_pct,
-            severity_fao_level=severity_level,
+            label=str(label),
+            confidence=float(conf) if conf is not None else None,
+            probs_json=json.dumps(probs, ensure_ascii=False) if probs is not None else None,
+
+            seg_enabled=bool(seg_enabled),
+
+            severity_pct=float(severity_pct) if severity_pct is not None else None,
+            severity_fao_level=int(severity_level) if severity_level is not None else None,
         )
         db.add(row)
         db.commit()
-
     except SQLAlchemyError as e:
         db.rollback()
         raise RuntimeError(f"DB error: {e}") from e
     finally:
         db.close()
 
-    # bersihkan tmp bila diminta
+    # delete_temp_after: kalau None, pakai config
+    if delete_temp_after is None:
+        delete_temp_after = bool(Config.TEMP_DELETE_AFTER_SEG)
     if delete_temp_after:
-        from app.utils.temp_store import delete_bundle
         delete_bundle(analysis_id)
 
     return {
         "saved": True,
         "analysis_id": analysis_id,
+        "client_id": client_id,
         "orig_image_path": orig_saved_path,
         "seg_enabled": seg_enabled,
         "seg_overlay_path": overlay_saved_path,

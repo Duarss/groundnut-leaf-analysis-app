@@ -1,89 +1,123 @@
 // src/pages/HistoryPage.jsx
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
-// import { fetchHistory } from "../api/analysisApi";
+import Button from "../components/ui/Button";
+import { fetchHistoryList } from "../api/historyApi";
 
-const dummyHistory = [
-  {
-    id: "dummy-123",
-    label: "Leaf Spot (Early)",
-    severity_level: "Sedang",
-    severity_percent: 37.5,
-    created_at: "2025-11-19 10:15",
-  },
-  {
-    id: "dummy-124",
-    label: "Rust",
-    severity_level: "Berat",
-    severity_percent: 61.2,
-    created_at: "2025-11-18 16:02",
-  },
-];
+function toDateString(created_at) {
+  if (!created_at) return "-";
+  if (typeof created_at === "number") {
+    // unix seconds
+    return new Date(created_at * 1000).toLocaleString();
+  }
+  // string (misal "Tue, 03 Feb 2026 03:09:52 GMT")
+  const d = new Date(created_at);
+  return Number.isNaN(d.getTime()) ? String(created_at) : d.toLocaleString();
+}
 
-const HistoryPage = () => {
+function fmtPct(x) {
+  if (x === null || x === undefined) return "-";
+  const n = Number(x);
+  if (Number.isNaN(n)) return "-";
+  return `${n.toFixed(2)}%`;
+}
+
+function fmtConf(x) {
+  if (x === null || x === undefined) return "-";
+  const n = Number(x);
+  if (Number.isNaN(n)) return "-";
+  return n.toFixed(6);
+}
+
+export default function HistoryPage() {
+  const nav = useNavigate();
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false); // ✅ default false biar aman
+  const [errMsg, setErrMsg] = useState("");
 
   useEffect(() => {
-    async function load() {
+    const ctrl = new AbortController();
+    let alive = true;
+
+    (async () => {
+      setLoading(true);
+      setErrMsg("");
+
       try {
-        setLoading(true);
-        setError("");
-        // const data = await fetchHistory();
-        // setItems(data);
-        setTimeout(() => {
-          setItems(dummyHistory);
-          setLoading(false);
-        }, 400);
-      } catch (err) {
-        setError(err.message || "Gagal memuat riwayat.");
-        setLoading(false);
+        const data = await fetchHistoryList(
+          { limit: 50, offset: 0 },
+          { signal: ctrl.signal }
+        );
+
+        // ✅ ambil items dari berbagai kemungkinan bentuk response
+        const list =
+          (Array.isArray(data?.items) && data.items) ||
+          (Array.isArray(data?.data?.items) && data.data.items) ||
+          (Array.isArray(data) && data) ||
+          [];
+
+        if (alive) setItems(list);
+      } catch (e) {
+        if (e?.name === "AbortError") return;
+        if (alive) {
+          setItems([]);
+          setErrMsg(e?.message || "Gagal memuat history");
+        }
+      } finally {
+        if (alive) setLoading(false);
       }
-    }
-    load();
+    })();
+
+    return () => {
+      alive = false;
+      ctrl.abort();
+    };
   }, []);
 
-  return (
-    <div className="page page-history">
-      <h2>Riwayat Penggunaan Sistem</h2>
-      <p className="page-description">
-        Halaman ini menyimpan hasil klasifikasi dan analisis yang telah kamu
-        lakukan sebelumnya. Kamu dapat membuka kembali detail setiap analisis
-        termasuk segmentasi dan tingkat keparahan penyakit.
-      </p>
+  const hasItems = useMemo(
+    () => Array.isArray(items) && items.length > 0,
+    [items]
+  );
 
-      <Card title="Daftar Riwayat">
-        {loading && <p>Memuat riwayat...</p>}
-        {error && <p className="error-text">{error}</p>}
-        {!loading && !error && items.length === 0 && (
-          <p className="placeholder">Belum ada riwayat penggunaan.</p>
+  return (
+    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <Card title="Riwayat Analisis">
+        {loading && <p>Memuat...</p>}
+
+        {!loading && errMsg && (
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ color: "crimson", margin: 0 }}>{errMsg}</p>
+          </div>
         )}
 
-        {!loading && !error && items.length > 0 && (
-          <div className="history-table-wrapper">
-            <table className="history-table">
+        {!loading && !errMsg && !hasItems && (
+          <p style={{ margin: 0 }}>Belum ada data tersimpan</p>
+        )}
+
+        {!loading && hasItems && (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  <th>Waktu</th>
-                  <th>Penyakit</th>
-                  <th>Keparahan</th>
-                  <th>Persentase</th>
-                  <th>Aksi</th>
+                  <th style={th}>Waktu</th>
+                  <th style={th}>Label</th>
+                  <th style={th}>Confidence</th>
+                  <th style={th}>Severity</th>
+                  <th style={th}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.created_at}</td>
-                    <td>{row.label}</td>
-                    <td>{row.severity_level}</td>
-                    <td>{row.severity_percent.toFixed(1)}%</td>
-                    <td>
-                      <Link to={`/history/${row.id}`} className="link">
-                        Lihat Detail
-                      </Link>
+                {items.map((it) => (
+                  <tr key={it.analysis_id}>
+                    <td style={td}>{toDateString(it.created_at)}</td>
+                    <td style={td}>{it.label ?? "-"}</td>
+                    <td style={td}>{fmtConf(it.confidence)}</td>
+                    <td style={td}>{fmtPct(it.severity_pct)}</td>
+                    <td style={td}>
+                      <Button onClick={() => nav(`/history/${it.analysis_id}`)}>
+                        Detail
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -94,6 +128,17 @@ const HistoryPage = () => {
       </Card>
     </div>
   );
+}
+
+const th = {
+  textAlign: "left",
+  padding: "10px 8px",
+  borderBottom: "1px solid #ddd",
+  whiteSpace: "nowrap",
 };
 
-export default HistoryPage;
+const td = {
+  padding: "10px 8px",
+  borderBottom: "1px solid #eee",
+  verticalAlign: "top",
+};

@@ -1,12 +1,19 @@
 # app/models/analysis_result.py
-from sqlalchemy import Column, String, Integer, Float, Text, Boolean
+from sqlalchemy import Column, String, TIMESTAMP, Integer, Float, Text, Boolean
+from sqlalchemy.sql import func
 from app.database.db import Base
 
 class AnalysisResult(Base):
     __tablename__ = "analysis_results"
 
     analysis_id = Column(String(64), primary_key=True, index=True)
-    created_at = Column(Integer, nullable=False)
+    client_id = Column(String(64), index=True, nullable=False)
+
+    created_at = Column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+        nullable=False
+    )
 
     # image refs
     orig_image_path = Column(Text, nullable=False)
