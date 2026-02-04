@@ -1,6 +1,23 @@
 # app/services/history_service.py
+from datetime import timezone
 from app.database.db import SessionLocal
 from app.models.analysis_result import AnalysisResult
+
+
+def _to_iso_utc(dt):
+    """
+    Pastikan output selalu ISO string.
+    Kalau datetime dari DB naive (tanpa tzinfo), anggap UTC.
+    """
+    if dt is None:
+        return None
+    try:
+        tz = getattr(dt, "tzinfo", None)
+        if tz is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
+    except Exception:
+        return str(dt)
 
 
 def list_history(client_id: str, limit: int = 50, offset: int = 0):
@@ -17,26 +34,26 @@ def list_history(client_id: str, limit: int = 50, offset: int = 0):
 
         items = []
         for r in rows:
-            items.append({
-                "analysis_id": r.analysis_id,
-                "created_at": r.created_at,  # biar route yang stringify (atau bisa iso di sini juga)
-                "label": r.label,
-                "confidence": r.confidence,
-                "severity_pct": r.severity_pct,
-            })
+            items.append(
+                {
+                    "analysis_id": r.analysis_id,
+                    "created_at": _to_iso_utc(r.created_at),
+                    "label": r.label,
+                    "confidence": r.confidence,
+                    "seg_enabled": r.seg_enabled,
+                    "severity_pct": r.severity_pct,
+                    "severity_fao_level": r.severity_fao_level,
+                }
+            )
 
-        return {
-            "items": items,
-            "limit": int(limit),
-            "offset": int(offset),
-        }
+        return {"items": items, "limit": int(limit), "offset": int(offset)}
     finally:
         db.close()
 
 
 def get_history_detail(analysis_id: str, client_id: str) -> dict:
     """
-    WAJIB: client_id dikirim dari route (jangan pakai variable global / undefined).
+    WAJIB: client_id dikirim dari route.
     """
     if not client_id:
         raise ValueError("client_id wajib")
@@ -56,7 +73,7 @@ def get_history_detail(analysis_id: str, client_id: str) -> dict:
             "analysis_id": row.analysis_id,
             "client_id": row.client_id,
             "confidence": row.confidence,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "created_at": _to_iso_utc(row.created_at),
             "label": row.label,
             "orig_image_path": row.orig_image_path,
             "probs_json": row.probs_json,

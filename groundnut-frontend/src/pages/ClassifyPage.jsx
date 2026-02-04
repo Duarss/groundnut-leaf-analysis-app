@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { classifyImage, saveAnalysis } from "../api/analysisApi";
+import { useIsMobile } from "../utils/useIsMobile";
+import ImageBox from "../components/ui/ImageBox";
 
 const _sessionKey = (analysisId) => `analysis_session_${analysisId}`;
 
@@ -17,6 +19,7 @@ function _fileToDataUrl(file) {
 }
 
 const ClassifyPage = () => {
+  const isMobile = useIsMobile();
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -28,7 +31,7 @@ const ClassifyPage = () => {
   const handleFileChange = (e) => {
     const f = e.target.files?.[0];
     setError("");
-    setResult(null); // clear previous result when change image
+    setResult(null);
     if (!f) return;
     setFile(f);
     setPreviewUrl(URL.createObjectURL(f));
@@ -47,10 +50,8 @@ const ClassifyPage = () => {
 
     try {
       const data = await classifyImage(file);
-      // Expect structure from backend: { id, label, confidence, probs }
       setResult(data);
 
-      // Simpan sementara agar tahap segmentasi tidak perlu upload ulang
       try {
         const originalDataUrl = await _fileToDataUrl(file);
         sessionStorage.setItem(
@@ -76,7 +77,6 @@ const ClassifyPage = () => {
   const handleGoToSegment = () => {
     const analysisId = result?.analysis_id || result?.id;
     if (!analysisId) return;
-    // Nanti halaman /segment/:id akan pakai id ini
     navigate(`/segment/${analysisId}`);
   };
 
@@ -94,34 +94,45 @@ const ClassifyPage = () => {
     }
   };
 
+  const gridStyle = {
+    display: "grid",
+    gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
+    gap: 16,
+    alignItems: "start",
+  };
+
   return (
     <div className="page page-classify">
       <h2>Klasifikasi Penyakit Daun Kacang Tanah</h2>
       <p className="page-description">
-        Unggah citra daun kacang tanah dengan pencahayaan cukup, latar belakang
-        jelas, dan daun terlihat utuh. Sistem akan memprediksi jenis penyakit
-        menggunakan model EfficientNet-B4.
+        Unggah citra daun kacang tanah. Sistem akan memprediksi jenis penyakit menggunakan model EfficientNet-B4.
       </p>
 
-      <div className="grid-two">
+      <div className="grid-two" style={gridStyle}>
         <Card title="Unggah Citra" subtitle="Langkah 1 dari 2">
           <form onSubmit={handleSubmit} className="upload-form">
-            <label className="upload-box">
+            <label className="upload-box" style={{ display: "block" }}>
               <input type="file" accept="image/*" onChange={handleFileChange} />
-              <span>
-                {file ? "Ganti file citra" : "Klik untuk memilih atau drop file di sini"}
-              </span>
+              <span>{file ? "Ganti file citra" : "Klik untuk memilih atau drop file di sini"}</span>
             </label>
 
+            {/* ✅ mobile-friendly preview */}
             {previewUrl && (
-              <div className="image-preview">
-                <img src={previewUrl} alt="Preview daun" />
+              <div style={{ marginTop: 12 }}>
+                <ImageBox
+                  src={previewUrl}
+                  alt="Preview daun"
+                  isMobile={isMobile}
+                  maxHeightMobile={220}
+                  maxHeightDesktop={420}
+                  allowExpand={true}
+                />
               </div>
             )}
 
             {error && <p className="error-text">{error}</p>}
 
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} style={isMobile ? { width: "100%" } : undefined}>
               {isLoading ? "Memproses..." : "Klasifikasikan"}
             </Button>
           </form>
@@ -130,8 +141,7 @@ const ClassifyPage = () => {
         <Card title="Hasil Klasifikasi" subtitle="Prediksi penyakit berdasarkan model CNN">
           {!result && !isLoading && (
             <p className="placeholder">
-              Hasil prediksi akan muncul di sini setelah kamu mengunggah citra
-              dan menekan tombol <b>Klasifikasikan</b>.
+              Hasil prediksi akan muncul setelah kamu mengunggah citra dan menekan <b>Klasifikasikan</b>.
             </p>
           )}
 
@@ -149,7 +159,11 @@ const ClassifyPage = () => {
                   {Object.entries(result.probs)
                     .sort((a, b) => b[1] - a[1])
                     .map(([cls, p]) => (
-                      <div key={cls} className="prob-row">
+                      <div
+                        key={cls}
+                        className="prob-row"
+                        style={{ display: "flex", justifyContent: "space-between" }}
+                      >
                         <span>{cls}</span>
                         <span>{(p * 100).toFixed(1)}%</span>
                       </div>
@@ -157,17 +171,19 @@ const ClassifyPage = () => {
                 </div>
               )}
 
-              <div className="result-actions">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
                 {String(result.label || "").trim().toLowerCase() === "healthy" ? (
                   <>
-                    <Button onClick={handleSave} disabled={saveStatus.loading}>
+                    <Button onClick={handleSave} disabled={saveStatus.loading} style={isMobile ? { width: "100%" } : undefined}>
                       {saveStatus.loading ? "Menyimpan..." : "Simpan Hasil"}
                     </Button>
-                    {saveStatus.msg && <p className="success-text">{saveStatus.msg}</p>}
-                    {saveStatus.err && <p className="error-text">{saveStatus.err}</p>}
+                    {saveStatus.msg && <p className="success-text" style={{ margin: 0 }}>{saveStatus.msg}</p>}
+                    {saveStatus.err && <p className="error-text" style={{ margin: 0 }}>{saveStatus.err}</p>}
                   </>
                 ) : (
-                  <Button onClick={handleGoToSegment}>Lihat Segmentasi</Button>
+                  <Button onClick={handleGoToSegment} style={isMobile ? { width: "100%" } : undefined}>
+                    Lihat Area Terinfeksi & Estimasi Keparahan
+                  </Button>
                 )}
               </div>
             </div>

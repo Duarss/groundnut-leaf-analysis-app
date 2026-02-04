@@ -48,7 +48,7 @@ const Navbar = () => {
             Beranda
           </NavLink>
           <NavLink to="/classify" onClick={closeMenu}>
-            Klasifikasi
+            Analisa
           </NavLink>
           <NavLink to="/history" onClick={closeMenu}>
             Riwayat
