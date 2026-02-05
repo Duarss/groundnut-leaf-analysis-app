@@ -1,0 +1,7 @@
+# Ignore all dataset contents
+/raw/
+/processed/
+/results/
+
+# Allow the folder itself to exist
+!.gitignore
