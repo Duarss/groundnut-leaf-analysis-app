@@ -1,5 +1,6 @@
 # app/api/analyze_routes.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
+from app.utils.temp_store import find_image_path
 from app.services.classification_service import classify_uploaded_image
 from app.services.segmentation_service import segment_infected_areas
 from app.services.save_service import save_analysis
@@ -19,7 +20,6 @@ def _get_client_id():
         return str(cid).strip()
 
     return None
-
 
 @bp.route("/classify", methods=["POST"])
 def classify():
@@ -103,3 +103,20 @@ def history_detail(analysis_id):
         return jsonify(detail), 200
     except Exception as e:
         return jsonify({"error": "Gagal mengambil detail history", "detail": str(e)}), 500
+
+
+@bp.route("/temp-image/<analysis_id>", methods=["GET"])
+def temp_image(analysis_id):
+    """
+    Serve original image dari tmp_uploads berdasarkan analysis_id.
+    Dipakai oleh SegmentPage agar tidak bergantung pada sessionStorage.
+
+    GET /api/temp-image/<analysis_id>
+    """
+    try:
+        p = find_image_path(analysis_id)
+        if not p:
+            return jsonify({"error": "File gambar temporary tidak ditemukan"}), 404
+        return send_file(p, as_attachment=False)
+    except Exception as e:
+        return jsonify({"error": "Gagal mengambil citra temporary", "detail": str(e)}), 500

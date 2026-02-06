@@ -79,7 +79,7 @@ function waitForEvent(target, eventName, timeoutMs = 2500) {
   });
 }
 
-export default function ClassifyPage() {
+const ClassifyPage = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
 
@@ -102,6 +102,9 @@ export default function ClassifyPage() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
+
+  // ✅ NEW: processing state for "Proses Klasifikasi" button label
+  const [classifyBusy, setClassifyBusy] = useState(false);
 
   // Deskripsi penyakit ditampilkan ke user
   const diseaseInfo = useMemo(() => {
@@ -138,6 +141,7 @@ export default function ClassifyPage() {
     setFile(selectedFile);
     setError("");
     setResult(null);
+    setSaveStatus({ loading: false, msg: "", err: "" });
 
     const url = URL.createObjectURL(selectedFile);
     setPreviewUrl((prev) => {
@@ -159,14 +163,10 @@ export default function ClassifyPage() {
     setCameraBusy(true);
 
     try {
-      // kalau ada stream berjalan, tutup dulu
       stopCamera();
 
-      // prefer getUserMedia bila tersedia
       const canGUM = !!navigator.mediaDevices?.getUserMedia && window.isSecureContext;
-
       if (!canGUM) {
-        // fallback: file input capture (kamera device)
         if (captureInputRef.current) {
           captureInputRef.current.click();
         } else {
@@ -175,10 +175,7 @@ export default function ClassifyPage() {
         return;
       }
 
-      // buka panel dulu (biar videoRef pasti ter-mount)
       setCameraPanelOpen(true);
-
-      // stream akan di-start oleh useEffect di bawah
     } catch (e) {
       setCameraErr(e?.message || "Gagal membuka kamera.");
     } finally {
@@ -203,10 +200,8 @@ export default function ClassifyPage() {
       setCameraBusy(true);
 
       try {
-        // pastikan videoRef ada
         const v = videoRef.current;
         if (!v) {
-          // tunggu 1 tick render
           await new Promise((r) => setTimeout(r, 0));
         }
         const v2 = videoRef.current;
@@ -216,7 +211,6 @@ export default function ClassifyPage() {
           return;
         }
 
-        // request stream
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
@@ -227,7 +221,6 @@ export default function ClassifyPage() {
         });
 
         if (cancelled) {
-          // kalau sudah ditutup saat request berjalan
           try {
             stream.getTracks().forEach((t) => t.stop());
           } catch {
@@ -239,33 +232,25 @@ export default function ClassifyPage() {
         streamRef.current = stream;
         v2.srcObject = stream;
 
-        // tunggu metadata supaya videoWidth/videoHeight terisi
         await waitForEvent(v2, "loadedmetadata", 2500);
-        // play: tetap coba, tapi jangan bikin crash
         await v2.play().catch(() => {});
 
         if (!cancelled) setCameraOn(true);
 
-        // cek siap capture (dimensi > 0)
-        const okSize =
-          (v2.videoWidth || 0) > 0 && (v2.videoHeight || 0) > 0;
-
+        const okSize = (v2.videoWidth || 0) > 0 && (v2.videoHeight || 0) > 0;
         if (!okSize && !cancelled) {
           setCameraErr("Kamera terbuka, tapi video belum siap. Coba tutup lalu buka lagi.");
         }
       } catch (e) {
-        // fallback ke capture input jika gagal karena permission/device
         const msg = e?.message || "Gagal membuka kamera.";
         setCameraErr(msg);
 
-        // auto fallback: jika ada input capture, langsung buka
         try {
           if (captureInputRef.current) captureInputRef.current.click();
         } catch {
           // ignore
         }
 
-        // tutup panel stream (biar user tidak bingung)
         stopCamera();
         setCameraPanelOpen(false);
       } finally {
@@ -306,7 +291,6 @@ export default function ClassifyPage() {
       const f = new File([blob], `camera_${Date.now()}.jpg`, { type: "image/jpeg" });
       handleSetSelectedFile(f);
 
-      // tutup panel kamera setelah capture
       closeCamera();
       setInputMode("upload");
     } catch (e) {
@@ -320,17 +304,21 @@ export default function ClassifyPage() {
     e.preventDefault();
     setError("");
     setResult(null);
+    setSaveStatus({ loading: false, msg: "", err: "" });
 
     if (!file) {
       setError("Silakan pilih gambar terlebih dahulu.");
       return;
     }
 
+    setClassifyBusy(true);
     try {
       const data = await classifyImage(file);
       setResult(data);
     } catch (err) {
       setError(err?.message || "Gagal memproses klasifikasi.");
+    } finally {
+      setClassifyBusy(false);
     }
   };
 
@@ -367,6 +355,38 @@ export default function ClassifyPage() {
     background: "#fff",
   };
 
+  const kvRow = {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: "10px 12px",
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    background: "#fff",
+  };
+
+  const pill = (tone = "neutral") => {
+    const map = {
+      neutral: { bg: "#f3f4f6", fg: "#374151", bd: "#e5e7eb" },
+      good: { bg: "#ecfdf5", fg: "#065f46", bd: "#a7f3d0" },
+      warn: { bg: "#fffbeb", fg: "#92400e", bd: "#fde68a" },
+      dark: { bg: "#111827", fg: "#ffffff", bd: "#111827" },
+    };
+    const t = map[tone] || map.neutral;
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "6px 10px",
+      borderRadius: 999,
+      border: `1px solid ${t.bd}`,
+      background: t.bg,
+      color: t.fg,
+      fontWeight: 800,
+      fontSize: 12,
+      whiteSpace: "nowrap",
+    };
+  };
+
   return (
     <div className="page">
       <div className="container">
@@ -401,7 +421,6 @@ export default function ClassifyPage() {
                       type="button"
                       onClick={() => {
                         setInputMode("camera");
-                        // tidak auto start: user klik "Buka Kamera"
                       }}
                       style={modeBtnStyle(inputMode === "camera")}
                     >
@@ -431,9 +450,7 @@ export default function ClassifyPage() {
                           <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
                         </label>
 
-                        <div style={{ fontSize: 12, color: "#6b7280" }}>
-                          Format: JPG/JPEG/PNG/HEIF
-                        </div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>Format: JPG/JPEG/PNG/HEIF</div>
                       </div>
 
                       {previewUrl && (
@@ -476,13 +493,11 @@ export default function ClassifyPage() {
                               style={{
                                 width: "100%",
                                 maxHeight: 380,
-                                display: cameraOn ? "block" : "block",
+                                display: "block",
                               }}
                             />
                             {!cameraOn && (
-                              <div style={{ padding: 12, color: "#e5e7eb", fontSize: 13 }}>
-                                Sedang menyiapkan kamera...
-                              </div>
+                              <div style={{ padding: 12, color: "#e5e7eb", fontSize: 13 }}>Sedang menyiapkan kamera...</div>
                             )}
                           </div>
 
@@ -514,40 +529,96 @@ export default function ClassifyPage() {
                   {error && <p className="error-text">{error}</p>}
 
                   <div style={{ marginTop: 12 }}>
-                    <Button type="submit" disabled={!file} style={isMobile ? { width: "100%" } : undefined}>
-                      Proses Klasifikasi
+                    <Button
+                      type="submit"
+                      disabled={!file || classifyBusy || saveStatus.loading}
+                      style={isMobile ? { width: "100%" } : undefined}
+                    >
+                      {classifyBusy ? "Memproses..." : "Proses Klasifikasi"}
                     </Button>
                   </div>
+
+                  {classifyBusy && (
+                    <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280" }}>
+                      Sedang mengirim gambar ke server dan menjalankan model...
+                    </div>
+                  )}
                 </form>
               </Card>
             </div>
 
+            {/* =======================
+                ✅ Revisi layout Langkah 2
+                ======================= */}
             <div>
               <Card title="Hasil Klasifikasi" subtitle="Langkah 2 dari 2">
-                {!result && <p className="muted">Belum ada hasil. Silakan unggah gambar dan klik proses.</p>}
+                {!result && !classifyBusy && (
+                  <div style={{ padding: 12, border: "1px dashed #e5e7eb", borderRadius: 12, background: "#fafafa" }}>
+                    <div style={{ fontWeight: 800, marginBottom: 6 }}>Belum ada hasil</div>
+                    <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5 }}>
+                      Pilih gambar pada langkah 1, lalu klik <b>Proses Klasifikasi</b>.
+                    </div>
+                  </div>
+                )}
+
+                {!result && classifyBusy && (
+                  <div style={{ padding: 12, border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                      <div style={{ fontWeight: 900 }}>Sedang memproses...</div>
+                      <span style={pill("dark")}>Running</span>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 13, color: "#6b7280", lineHeight: 1.5 }}>
+                      Mohon tunggu, sistem sedang melakukan inferensi model klasifikasi.
+                    </div>
+                    <div style={{ marginTop: 10, height: 10, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                      <div
+                        style={{
+                          width: "60%",
+                          height: "100%",
+                          background: "#111827",
+                          borderRadius: 999,
+                          animation: "pulse 1.2s ease-in-out infinite",
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {result && (
-                  <div className="result-block">
-                    <div className="result-row">
-                      <span className="muted">Label</span>
-                      <span className="strong">{result.label || "-"}</span>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {/* Ringkasan */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                      <span style={pill(result.segmentation_ready ? "warn" : "good")}>
+                        {result.segmentation_ready ? "Lanjut Segmentasi" : "Final (Sehat)"}
+                      </span>
                     </div>
 
-                    <div className="result-row">
-                      <span className="muted">Confidence</span>
-                      <span className="strong">
+                    <div style={kvRow}>
+                      <span style={{ color: "#6b7280", fontWeight: 700 }}>Label</span>
+                      <span style={{ fontWeight: 900 }}>{result.label || "-"}</span>
+                    </div>
+
+                    <div style={kvRow}>
+                      <span style={{ color: "#6b7280", fontWeight: 700 }}>Keyakinan</span>
+                      <span style={{ fontWeight: 900 }}>
                         {typeof result.confidence === "number" ? `${(result.confidence * 100).toFixed(2)}%` : "-"}
                       </span>
                     </div>
 
                     {/* ===== Deskripsi penyakit ===== */}
                     {diseaseInfo && (
-                      <div style={{ marginTop: 12 }}>
-                        <div style={{ fontWeight: 700, marginBottom: 6 }}>Deskripsi: {diseaseInfo.title}</div>
-                        <p style={{ margin: 0, lineHeight: 1.5 }}>{diseaseInfo.short}</p>
+                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fff" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                          <div style={{ fontWeight: 900 }}>Deskripsi</div>
+                          <span style={pill("neutral")}>{diseaseInfo.title}</span>
+                        </div>
+
+                        <p style={{ margin: "10px 0 0 0", lineHeight: 1.55, color: "#111827" }}>
+                          {diseaseInfo.short}
+                        </p>
 
                         {!!(diseaseInfo.sources || []).filter((s) => s?.url).length && (
-                          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+                          <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>
                             Sumber:&nbsp;
                             {(diseaseInfo.sources || [])
                               .filter((s) => s?.url)
@@ -566,23 +637,26 @@ export default function ClassifyPage() {
 
                     {/* ===== Debug probs (tidak tampil default) ===== */}
                     {SHOW_DEBUG_PROBS && result.probs && (
-                      <div className="prob-list" style={{ marginTop: 12 }}>
-                        {Object.entries(result.probs)
-                          .sort((a, b) => b[1] - a[1])
-                          .map(([cls, p]) => (
-                            <div
-                              key={cls}
-                              className="prob-row"
-                              style={{ display: "flex", justifyContent: "space-between" }}
-                            >
-                              <span>{cls}</span>
-                              <span>{(Number(p) * 100).toFixed(2)}%</span>
-                            </div>
-                          ))}
+                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fff" }}>
+                        <div style={{ fontWeight: 900, marginBottom: 8 }}>Debug Probabilitas</div>
+                        <div style={{ display: "grid", gap: 6 }}>
+                          {Object.entries(result.probs)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([cls, p]) => (
+                              <div
+                                key={cls}
+                                style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#111827" }}
+                              >
+                                <span>{cls}</span>
+                                <span style={{ fontVariantNumeric: "tabular-nums" }}>{(Number(p) * 100).toFixed(2)}%</span>
+                              </div>
+                            ))}
+                        </div>
                       </div>
                     )}
 
-                    <div style={{ marginTop: 12 }}>
+                    {/* CTA */}
+                    <div style={{ display: "grid", gap: 8 }}>
                       {result.segmentation_ready ? (
                         <Button onClick={handleGoToSegment} style={isMobile ? { width: "100%" } : undefined}>
                           Lihat Area Terinfeksi & Estimasi Keparahan
@@ -591,21 +665,21 @@ export default function ClassifyPage() {
                         <>
                           <Button
                             onClick={handleSave}
-                            disabled={saveStatus.loading}
+                            disabled={saveStatus.loading || classifyBusy}
                             style={isMobile ? { width: "100%" } : undefined}
                           >
                             {saveStatus.loading ? "Menyimpan..." : "Simpan Hasil"}
                           </Button>
 
                           {saveStatus.msg && (
-                            <p className="success-text" style={{ margin: 0 }}>
+                            <div style={{ fontSize: 13, color: "#065f46", fontWeight: 700 }}>
                               {saveStatus.msg}
-                            </p>
+                            </div>
                           )}
                           {saveStatus.err && (
-                            <p className="error-text" style={{ margin: 0 }}>
+                            <div style={{ fontSize: 13, color: "crimson", fontWeight: 700 }}>
                               {saveStatus.err}
-                            </p>
+                            </div>
                           )}
                         </>
                       )}
@@ -617,6 +691,17 @@ export default function ClassifyPage() {
           </div>
         </Card>
       </div>
+
+      {/* anim keyframes (inline) */}
+      <style>{`
+        @keyframes pulse {
+          0% { transform: translateX(-20%); opacity: .65; }
+          50% { transform: translateX(10%); opacity: 1; }
+          100% { transform: translateX(-20%); opacity: .65; }
+        }
+      `}</style>
     </div>
   );
 }
+
+export default ClassifyPage;

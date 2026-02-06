@@ -1,10 +1,11 @@
 # app/ml/segmentation/model_loader.py
 import json
+import threading
 import tensorflow as tf
 from tensorflow.keras import mixed_precision
 from tensorflow.keras.layers import (
     Input, Conv2D, Conv2DTranspose, Activation, Concatenate,
-    SpatialDropout2D, Lambda
+    SpatialDropout2D, BatchNormalization, Lambda
 )
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications import EfficientNetB0, efficientnet
@@ -27,6 +28,7 @@ BOT_DROPOUT = 0.0
 DEC_DROPOUT = 0.0
 
 _model = None
+_lock = threading.Lock()
 
 def _set_dropout_globals(cfg: dict):
     global BOT_DROPOUT, DEC_DROPOUT
@@ -34,8 +36,10 @@ def _set_dropout_globals(cfg: dict):
     DEC_DROPOUT = float(cfg.get("dec_dropout", 0.0))
 
 
-def _conv(x, f, k=3, drop=0.0):
-    x = Conv2D(f, k, padding="same", use_bias=True)(x)
+def _conv(x, f, k=3, use_bn=False, drop=0.0):
+    x = Conv2D(f, k, padding="same", use_bias=not use_bn)(x)
+    if use_bn:
+        x = BatchNormalization()(x)
     x = Activation("relu")(x)
     if drop and drop > 0:
         x = SpatialDropout2D(drop)(x)
@@ -55,16 +59,14 @@ def _safe_concat(x, skip, idx=0):
 def _decoder_block(x, skip, f, drop, idx=0):
     x = Conv2DTranspose(f, 2, strides=2, padding="same", name=f"up_{idx}")(x)
     x = _safe_concat(x, skip, idx=idx)
-    x = _conv(x, f, k=3, drop=drop)
-    x = _conv(x, f, k=3, drop=0.0)
+    x = _conv(x, f, k=3, use_bn=False, drop=drop)
+    x = _conv(x, f, k=3, use_bn=False, drop=0.0)
     return x
 
 
 def build_unet_efficientnetb0(net_h, net_w, out_channels=4, train_encoder=False):
     inp = Input((net_h, net_w, 3))
 
-    # sama seperti exe_segmentation_model.py:
-    # input 0..1 -> scale 255 -> efficientnet.preprocess_input
     x0 = Lambda(lambda t: t * 255.0, name="scale_255")(inp)
     x0 = efficientnet.preprocess_input(x0)
 
@@ -77,8 +79,8 @@ def build_unet_efficientnetb0(net_h, net_w, out_channels=4, train_encoder=False)
     s4 = base.get_layer("block4a_activation").output
     b  = base.get_layer("top_activation").output
 
-    b = _conv(b, 256, k=3, drop=BOT_DROPOUT)
-    b = _conv(b, 256, k=3, drop=0.0)
+    b = _conv(b, 256, k=3, use_bn=False, drop=BOT_DROPOUT)
+    b = _conv(b, 256, k=3, use_bn=False, drop=0.0)
 
     d4 = _decoder_block(b,  s4, 256, drop=DEC_DROPOUT, idx=4)
     d3 = _decoder_block(d4, s3, 128, drop=DEC_DROPOUT, idx=3)
@@ -86,11 +88,11 @@ def build_unet_efficientnetb0(net_h, net_w, out_channels=4, train_encoder=False)
     d1 = _decoder_block(d2, s1, 32,  drop=DEC_DROPOUT, idx=1)
 
     x = Conv2DTranspose(16, 2, strides=2, padding="same", name="up_final")(d1)
-    x = _conv(x, 16, k=3, drop=0.0)
+    x = _conv(x, 16, k=3, use_bn=False, drop=0.0)
 
-    out = Conv2D(out_channels, 1, activation="sigmoid", dtype="float32", name="mask")(x)
+    out = Conv2D(out_channels, 1, activation="sigmoid", use_bias=True, dtype="float32", name="mask")(x)
     model = Model(inp, out, name="UNet_EfficientNetB0")
-    return model
+    return model, base
 
 
 def load_selected_cfg():
@@ -105,13 +107,20 @@ def get_segmentation_model():
     global _model
     if _model is not None:
         return _model
+    
+    with _lock:
+        if _model is not None:
+            return _model
 
-    cfg = load_selected_cfg()
-    _set_dropout_globals(cfg)
+        cfg = load_selected_cfg()
+        _set_dropout_globals(cfg)
 
-    net_h, net_w = int(Config.SEG_IMG_H), int(Config.SEG_IMG_W)
-    _model = build_unet_efficientnetb0(net_h, net_w, out_channels=4, train_encoder=False)
-    _model.build((None, net_h, net_w, 3))
-    _model.load_weights(Config.BEST_SEG_WEIGHTS_PATH)
+        net_h, net_w = int(Config.SEG_IMG_H), int(Config.SEG_IMG_W)
+        m = build_unet_efficientnetb0(net_h, net_w, out_channels=4, train_encoder=False)
+        if isinstance(m, (tuple, list)):
+            m = m[0]
+        
+        m.load_weights(Config.BEST_SEG_WEIGHTS_PATH)
+        _model = m
 
-    return _model
+        return _model

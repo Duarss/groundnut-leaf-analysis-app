@@ -26,6 +26,8 @@ const SegmentPage = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [originalSrc, setOriginalSrc] = useState(""); // ✅ sekarang di-load dari backend tmp
   const [overlaySrc, setOverlaySrc] = useState("");
   const [maskSrc, setMaskSrc] = useState("");
 
@@ -44,9 +46,46 @@ const SegmentPage = () => {
     return raw ? _safeParse(raw) : null;
   }, [analysisId]);
 
-  const originalSrc = cached?.originalDataUrl || "";
   const diseaseLabel = cached?.label || cached?.result?.label || "";
   const confidence = cached?.confidence ?? cached?.result?.confidence;
+
+  // ✅ ambil citra original langsung dari tmp_uploads via backend
+  useEffect(() => {
+    if (!analysisId) return;
+
+    let alive = true;
+    let objectUrl = "";
+
+    async function loadOriginal() {
+      try {
+        // reset dulu
+        setOriginalSrc("");
+
+        const res = await fetch(`/api/temp-image/${encodeURIComponent(analysisId)}`, {
+          method: "GET",
+        });
+
+        if (!res.ok) {
+          // kalau tidak ada file temp (misal TTL habis), biarkan kosong
+          return;
+        }
+
+        const blob = await res.blob();
+        objectUrl = URL.createObjectURL(blob);
+        if (alive) setOriginalSrc(objectUrl);
+      } catch (e) {
+        void e;
+        // silent fail → fallback tetap kosong
+      }
+    }
+
+    loadOriginal();
+
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [analysisId]);
 
   useEffect(() => {
     setError("");
@@ -137,7 +176,8 @@ const SegmentPage = () => {
 
   const faoText = (() => {
     if (faoLevel == null || Number.isNaN(faoLevel)) return "-";
-    if (Array.isArray(faoRange) && faoRange.length === 2) return `Level ${faoLevel} (rentang ${faoRange[0]}–${faoRange[1]}%)`;
+    if (Array.isArray(faoRange) && faoRange.length === 2)
+      return `Level ${faoLevel} (rentang ${faoRange[0]}–${faoRange[1]}%)`;
     return `Level ${faoLevel}`;
   })();
 
@@ -202,7 +242,7 @@ const SegmentPage = () => {
       >
         <Card title="Citra Asli">
           {!originalSrc ? (
-            <p className="placeholder">Citra asli tidak tersedia pada sesi ini.</p>
+            <p className="placeholder">Citra asli tidak tersedia (mungkin sudah kadaluarsa / belum ada di tmp_uploads).</p>
           ) : (
             <ImageBox
               src={originalSrc}
@@ -257,12 +297,20 @@ const SegmentPage = () => {
       )}
 
       <div style={{ marginTop: 16, gap: 10, display: "flex", flexWrap: "wrap" }}>
-        <Button onClick={handleRunSegmentation} disabled={isLoading || !analysisId} style={isMobile ? { width: "100%" } : undefined}>
+        <Button
+          onClick={handleRunSegmentation}
+          disabled={isLoading || !analysisId}
+          style={isMobile ? { width: "100%" } : undefined}
+        >
           {isLoading ? "Memproses..." : "Proses Segmentasi"}
         </Button>
 
         {canShowSave && (
-          <Button onClick={handleSave} disabled={saveStatus.loading || !analysisId} style={isMobile ? { width: "100%" } : undefined}>
+          <Button
+            onClick={handleSave}
+            disabled={saveStatus.loading || !analysisId}
+            style={isMobile ? { width: "100%" } : undefined}
+          >
             {saveStatus.loading ? "Menyimpan..." : "Simpan Hasil"}
           </Button>
         )}
