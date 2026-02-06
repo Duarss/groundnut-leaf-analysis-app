@@ -1,5 +1,5 @@
 // src/pages/ClassifyPage.jsx
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -7,191 +7,616 @@ import { classifyImage, saveAnalysis } from "../api/analysisApi";
 import { useIsMobile } from "../utils/useIsMobile";
 import ImageBox from "../components/ui/ImageBox";
 
-const _sessionKey = (analysisId) => `analysis_session_${analysisId}`;
+// ====== Disease description (shown to user instead of probs_json) ======
+// Catatan: link sumber tetap di komentar (untuk catatan ilmiah).
+// - Groundnut rosette disease (CABI): https://www.cabi.org/isc/datasheet/22097
+// - Peanut rust (UF/IFAS EDIS): https://edis.ifas.ufl.edu/publication/PP288
+// - Peanut leaf spots (early & late) review: https://www.mdpi.com/2076-2607/11/8/2158
+const DISEASE_INFO = {
+  HEALTHY: {
+    title: "HEALTHY (Daun Sehat)",
+    short:
+      "Daun tampak normal tanpa gejala bercak/lesi khas penyakit. Tetap lakukan perawatan budidaya yang baik (monitoring rutin, nutrisi seimbang, sanitasi lahan).",
+    sources: [{ label: "Catatan umum budidaya", url: "" }],
+  },
+  "ALTERNARIA LEAF SPOT": {
+    title: "ALTERNARIA LEAF SPOT",
+    short:
+      "Penyakit jamur yang umumnya memunculkan bercak nekrotik cokelat–kehitaman, kadang dengan pola konsentris/‘target spot’. Bercak dapat melebar dan menyebabkan klorosis/kerontokan daun pada infeksi berat.",
+    sources: [{ label: "Literatur Alternaria pada groundnut", url: "" }],
+  },
+  "LEAF SPOT (EARLY AND LATE)": {
+    title: "LEAF SPOT (EARLY & LATE)",
+    short:
+      "Kelompok penyakit bercak daun pada kacang tanah (early leaf spot & late leaf spot) yang menyebabkan bercak pada daun, mengurangi luas fotosintesis, dan pada kasus berat memicu defoliasi sehingga menurunkan hasil.",
+    sources: [{ label: "Review ilmiah leaf spot", url: "https://www.mdpi.com/2076-2607/11/8/2158" }],
+  },
+  ROSETTE: {
+    title: "ROSETTE",
+    short:
+      "Groundnut rosette disease adalah penyakit virus kompleks (sering terkait vektor aphid) yang menyebabkan pertumbuhan kerdil, rosetting (daun mengumpul/berbentuk roset), klorosis, dan penurunan hasil yang signifikan.",
+    sources: [{ label: "CABI datasheet", url: "https://www.cabi.org/isc/datasheet/22097" }],
+  },
+  RUST: {
+    title: "RUST",
+    short:
+      "Peanut rust disebabkan jamur (Puccinia arachidis) dengan gejala pustula berwarna cokelat-oranye (karat) terutama di permukaan bawah daun. Infeksi berat dapat menyebabkan daun menguning dan rontok.",
+    sources: [{ label: "UF/IFAS EDIS", url: "https://edis.ifas.ufl.edu/publication/PP288" }],
+  },
+};
 
-function _fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Gagal membaca file gambar."));
-    reader.readAsDataURL(file);
+const SHOW_DEBUG_PROBS = false;
+
+function _normLabelForInfo(label) {
+  const s = String(label || "").trim().toUpperCase();
+  if (!s) return "";
+  if (s === "LEAF SPOT" || s === "LEAFSPOT") return "LEAF SPOT (EARLY AND LATE)";
+  return s;
+}
+
+// helper: tunggu event/condition dengan timeout
+function waitForEvent(target, eventName, timeoutMs = 2500) {
+  return new Promise((resolve) => {
+    let done = false;
+    const onDone = (ok) => {
+      if (done) return;
+      done = true;
+      try {
+        target.removeEventListener(eventName, onEvt);
+      } catch {
+        // ignore
+      }
+      resolve(ok);
+    };
+    const onEvt = () => onDone(true);
+    try {
+      target.addEventListener(eventName, onEvt, { once: true });
+    } catch {
+      onDone(false);
+      return;
+    }
+    setTimeout(() => onDone(false), timeoutMs);
   });
 }
 
-const ClassifyPage = () => {
+export default function ClassifyPage() {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+
+  // UI mode: upload vs camera
+  const [inputMode, setInputMode] = useState("upload"); // "upload" | "camera"
+
+  // Camera state
+  const [cameraPanelOpen, setCameraPanelOpen] = useState(false);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [cameraErr, setCameraErr] = useState("");
+  const [cameraBusy, setCameraBusy] = useState(false);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const captureInputRef = useRef(null);
+
+  // Result state
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
-  const navigate = useNavigate();
 
-  const handleFileChange = (e) => {
-    const f = e.target.files?.[0];
+  // Deskripsi penyakit ditampilkan ke user
+  const diseaseInfo = useMemo(() => {
+    const key = _normLabelForInfo(result?.label);
+    return DISEASE_INFO[key] || null;
+  }, [result?.label]);
+
+  const stopCamera = () => {
+    try {
+      const s = streamRef.current;
+      if (s) s.getTracks().forEach((t) => t.stop());
+    } catch {
+      // ignore
+    }
+    streamRef.current = null;
+    setCameraOn(false);
+  };
+
+  // cleanup unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return "";
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSetSelectedFile = (selectedFile) => {
+    if (!selectedFile) return;
+
+    setFile(selectedFile);
     setError("");
     setResult(null);
-    if (!f) return;
-    setFile(f);
-    setPreviewUrl(URL.createObjectURL(f));
+
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+  };
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files?.[0];
+    handleSetSelectedFile(selectedFile);
+  };
+
+  // === Single action: "Buka Kamera"
+  // Jika getUserMedia ada -> buka panel & start stream
+  // Jika tidak ada / gagal -> fallback ke input capture device (tetap dari tombol yang sama)
+  const openCamera = async () => {
+    setCameraErr("");
+    setCameraBusy(true);
+
+    try {
+      // kalau ada stream berjalan, tutup dulu
+      stopCamera();
+
+      // prefer getUserMedia bila tersedia
+      const canGUM = !!navigator.mediaDevices?.getUserMedia && window.isSecureContext;
+
+      if (!canGUM) {
+        // fallback: file input capture (kamera device)
+        if (captureInputRef.current) {
+          captureInputRef.current.click();
+        } else {
+          setCameraErr("Kamera tidak tersedia di browser ini.");
+        }
+        return;
+      }
+
+      // buka panel dulu (biar videoRef pasti ter-mount)
+      setCameraPanelOpen(true);
+
+      // stream akan di-start oleh useEffect di bawah
+    } catch (e) {
+      setCameraErr(e?.message || "Gagal membuka kamera.");
+    } finally {
+      setCameraBusy(false);
+    }
+  };
+
+  const closeCamera = () => {
+    stopCamera();
+    setCameraPanelOpen(false);
+    setCameraErr("");
+  };
+
+  // Start stream ketika panel kamera dibuka
+  useEffect(() => {
+    let cancelled = false;
+
+    async function startStreamWhenReady() {
+      if (!cameraPanelOpen) return;
+
+      setCameraErr("");
+      setCameraBusy(true);
+
+      try {
+        // pastikan videoRef ada
+        const v = videoRef.current;
+        if (!v) {
+          // tunggu 1 tick render
+          await new Promise((r) => setTimeout(r, 0));
+        }
+        const v2 = videoRef.current;
+        if (!v2) {
+          setCameraErr("Komponen video belum siap. Coba tutup-buka panel Kamera.");
+          setCameraPanelOpen(false);
+          return;
+        }
+
+        // request stream
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+
+        if (cancelled) {
+          // kalau sudah ditutup saat request berjalan
+          try {
+            stream.getTracks().forEach((t) => t.stop());
+          } catch {
+            // ignore
+          }
+          return;
+        }
+
+        streamRef.current = stream;
+        v2.srcObject = stream;
+
+        // tunggu metadata supaya videoWidth/videoHeight terisi
+        await waitForEvent(v2, "loadedmetadata", 2500);
+        // play: tetap coba, tapi jangan bikin crash
+        await v2.play().catch(() => {});
+
+        if (!cancelled) setCameraOn(true);
+
+        // cek siap capture (dimensi > 0)
+        const okSize =
+          (v2.videoWidth || 0) > 0 && (v2.videoHeight || 0) > 0;
+
+        if (!okSize && !cancelled) {
+          setCameraErr("Kamera terbuka, tapi video belum siap. Coba tutup lalu buka lagi.");
+        }
+      } catch (e) {
+        // fallback ke capture input jika gagal karena permission/device
+        const msg = e?.message || "Gagal membuka kamera.";
+        setCameraErr(msg);
+
+        // auto fallback: jika ada input capture, langsung buka
+        try {
+          if (captureInputRef.current) captureInputRef.current.click();
+        } catch {
+          // ignore
+        }
+
+        // tutup panel stream (biar user tidak bingung)
+        stopCamera();
+        setCameraPanelOpen(false);
+      } finally {
+        if (!cancelled) setCameraBusy(false);
+      }
+    }
+
+    startStreamWhenReady();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraPanelOpen]);
+
+  const captureFromCamera = async () => {
+    setCameraErr("");
+    setCameraBusy(true);
+
+    try {
+      const v = videoRef.current;
+      if (!v) throw new Error("Komponen video belum siap. Coba tutup-buka panel Kamera.");
+
+      const w = v.videoWidth || 0;
+      const h = v.videoHeight || 0;
+      if (w <= 0 || h <= 0) throw new Error("Video belum siap untuk capture. Coba tunggu sebentar lalu coba lagi.");
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(v, 0, 0, w, h);
+
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+      if (!blob) throw new Error("Gagal mengambil foto dari kamera.");
+
+      const f = new File([blob], `camera_${Date.now()}.jpg`, { type: "image/jpeg" });
+      handleSetSelectedFile(f);
+
+      // tutup panel kamera setelah capture
+      closeCamera();
+      setInputMode("upload");
+    } catch (e) {
+      setCameraErr(e?.message || "Gagal capture foto.");
+    } finally {
+      setCameraBusy(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) {
-      setError("Silakan pilih citra daun terlebih dahulu.");
-      return;
-    }
-
-    setIsLoading(true);
     setError("");
     setResult(null);
+
+    if (!file) {
+      setError("Silakan pilih gambar terlebih dahulu.");
+      return;
+    }
 
     try {
       const data = await classifyImage(file);
       setResult(data);
-
-      try {
-        const originalDataUrl = await _fileToDataUrl(file);
-        sessionStorage.setItem(
-          _sessionKey(data.analysis_id),
-          JSON.stringify({
-            analysis_id: data.analysis_id,
-            label: data.label,
-            confidence: data.confidence,
-            probs: data.probs,
-            originalDataUrl,
-          })
-        );
-      } catch (e) {
-        void e;
-      }
     } catch (err) {
-      setError(err.message || "Terjadi kesalahan saat klasifikasi.");
-    } finally {
-      setIsLoading(false);
+      setError(err?.message || "Gagal memproses klasifikasi.");
     }
   };
 
   const handleGoToSegment = () => {
-    const analysisId = result?.analysis_id || result?.id;
-    if (!analysisId) return;
-    navigate(`/segment/${analysisId}`);
+    if (!result?.analysis_id) return;
+    navigate(`/segment/${result.analysis_id}`);
   };
 
   const handleSave = async () => {
-    const analysisId = result?.analysis_id || result?.id;
-    if (!analysisId) return;
+    if (!result?.analysis_id) return;
 
     setSaveStatus({ loading: true, msg: "", err: "" });
     try {
-      const res = await saveAnalysis(analysisId);
-      if (!res?.saved) throw new Error(res?.error || "Gagal menyimpan hasil analisis.");
-      setSaveStatus({ loading: false, msg: "Hasil analisis berhasil disimpan.", err: "" });
+      const data = await saveAnalysis(result.analysis_id);
+      setSaveStatus({ loading: false, msg: data?.message || "Berhasil disimpan.", err: "" });
     } catch (e) {
-      setSaveStatus({ loading: false, msg: "", err: e.message || "Gagal menyimpan hasil analisis." });
+      setSaveStatus({ loading: false, msg: "", err: e?.message || "Gagal menyimpan." });
     }
   };
 
-  const gridStyle = {
-    display: "grid",
-    gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
-    gap: 16,
-    alignItems: "start",
+  // UI helpers
+  const modeBtnStyle = (active) => ({
+    flex: 1,
+    justifyContent: "center",
+    border: active ? "2px solid #111827" : "1px solid #e5e7eb",
+    background: active ? "#111827" : "#fff",
+    color: active ? "#fff" : "#111827",
+  });
+
+  const panelStyle = {
+    border: "1px solid #e5e7eb",
+    borderRadius: 14,
+    padding: 12,
+    background: "#fff",
   };
 
   return (
-    <div className="page page-classify">
-      <h2>Klasifikasi Penyakit Daun Kacang Tanah</h2>
-      <p className="page-description">
-        Unggah citra daun kacang tanah. Sistem akan memprediksi jenis penyakit menggunakan model EfficientNet-B4.
-      </p>
+    <div className="page">
+      <div className="container">
+        <Card title="Klasifikasi Penyakit Daun Kacang Tanah" subtitle="Unggah citra daun untuk memulai analisis">
+          <div className="grid-2">
+            <div>
+              <Card title="Input Citra" subtitle="Langkah 1 dari 2">
+                <form onSubmit={handleSubmit} className="upload-form">
+                  {/* hidden capture input (fallback kamera device) */}
+                  <input
+                    ref={captureInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileChange}
+                    style={{ display: "none" }}
+                  />
 
-      <div className="grid-two" style={gridStyle}>
-        <Card title="Unggah Citra" subtitle="Langkah 1 dari 2">
-          <form onSubmit={handleSubmit} className="upload-form">
-            <label className="upload-box" style={{ display: "block" }}>
-              <input type="file" accept="image/*" onChange={handleFileChange} />
-              <span>{file ? "Ganti file citra" : "Klik untuk memilih atau drop file di sini"}</span>
-            </label>
-
-            {/* ✅ mobile-friendly preview */}
-            {previewUrl && (
-              <div style={{ marginTop: 12 }}>
-                <ImageBox
-                  src={previewUrl}
-                  alt="Preview daun"
-                  isMobile={isMobile}
-                  maxHeightMobile={220}
-                  maxHeightDesktop={420}
-                  allowExpand={true}
-                />
-              </div>
-            )}
-
-            {error && <p className="error-text">{error}</p>}
-
-            <Button type="submit" disabled={isLoading} style={isMobile ? { width: "100%" } : undefined}>
-              {isLoading ? "Memproses..." : "Klasifikasikan"}
-            </Button>
-          </form>
-        </Card>
-
-        <Card title="Hasil Klasifikasi" subtitle="Prediksi penyakit berdasarkan model CNN">
-          {!result && !isLoading && (
-            <p className="placeholder">
-              Hasil prediksi akan muncul setelah kamu mengunggah citra dan menekan <b>Klasifikasikan</b>.
-            </p>
-          )}
-
-          {isLoading && <p className="placeholder">Model sedang memproses citra...</p>}
-
-          {result && !isLoading && (
-            <div className="result-block">
-              <h3 className="result-label">{result.label}</h3>
-              <p>
-                Keyakinan model: <b>{(result.confidence * 100).toFixed(1)}%</b>
-              </p>
-
-              {result.probs && (
-                <div className="prob-list">
-                  {Object.entries(result.probs)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([cls, p]) => (
-                      <div
-                        key={cls}
-                        className="prob-row"
-                        style={{ display: "flex", justifyContent: "space-between" }}
-                      >
-                        <span>{cls}</span>
-                        <span>{(p * 100).toFixed(1)}%</span>
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
-                {String(result.label || "").trim().toLowerCase() === "healthy" ? (
-                  <>
-                    <Button onClick={handleSave} disabled={saveStatus.loading} style={isMobile ? { width: "100%" } : undefined}>
-                      {saveStatus.loading ? "Menyimpan..." : "Simpan Hasil"}
+                  {/* Mode selector */}
+                  <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setInputMode("upload");
+                        closeCamera();
+                      }}
+                      style={modeBtnStyle(inputMode === "upload")}
+                    >
+                      Upload Foto
                     </Button>
-                    {saveStatus.msg && <p className="success-text" style={{ margin: 0 }}>{saveStatus.msg}</p>}
-                    {saveStatus.err && <p className="error-text" style={{ margin: 0 }}>{saveStatus.err}</p>}
-                  </>
-                ) : (
-                  <Button onClick={handleGoToSegment} style={isMobile ? { width: "100%" } : undefined}>
-                    Lihat Area Terinfeksi & Estimasi Keparahan
-                  </Button>
-                )}
-              </div>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setInputMode("camera");
+                        // tidak auto start: user klik "Buka Kamera"
+                      }}
+                      style={modeBtnStyle(inputMode === "camera")}
+                    >
+                      Kamera
+                    </Button>
+                  </div>
+
+                  {/* Upload panel */}
+                  {inputMode === "upload" && (
+                    <div style={panelStyle}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                        <label
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "10px 12px",
+                            borderRadius: 12,
+                            border: "1px dashed #cbd5e1",
+                            cursor: "pointer",
+                            background: "#f8fafc",
+                            flex: 1,
+                            minWidth: 220,
+                          }}
+                        >
+                          <span style={{ fontWeight: 800 }}>Pilih file gambar</span>
+                          <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
+                        </label>
+
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>
+                          Format: JPG/JPEG/PNG/HEIF
+                        </div>
+                      </div>
+
+                      {previewUrl && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Preview</div>
+                          <ImageBox src={previewUrl} alt="preview" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Camera panel */}
+                  {inputMode === "camera" && (
+                    <div style={panelStyle}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                        <Button
+                          type="button"
+                          onClick={cameraPanelOpen ? closeCamera : openCamera}
+                          disabled={cameraBusy}
+                          style={isMobile ? { width: "100%" } : undefined}
+                        >
+                          {cameraPanelOpen ? "Tutup Kamera" : cameraBusy ? "Membuka..." : "Buka Kamera"}
+                        </Button>
+                      </div>
+
+                      {cameraErr && (
+                        <p className="error-text" style={{ marginTop: 10 }}>
+                          {cameraErr}
+                        </p>
+                      )}
+
+                      {cameraPanelOpen && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ borderRadius: 12, overflow: "hidden", background: "#111" }}>
+                            <video
+                              ref={videoRef}
+                              playsInline
+                              autoPlay
+                              muted
+                              style={{
+                                width: "100%",
+                                maxHeight: 380,
+                                display: cameraOn ? "block" : "block",
+                              }}
+                            />
+                            {!cameraOn && (
+                              <div style={{ padding: 12, color: "#e5e7eb", fontSize: 13 }}>
+                                Sedang menyiapkan kamera...
+                              </div>
+                            )}
+                          </div>
+
+                          <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                            <Button
+                              type="button"
+                              onClick={captureFromCamera}
+                              disabled={!cameraOn || cameraBusy}
+                              style={isMobile ? { width: "100%" } : undefined}
+                            >
+                              {cameraBusy ? "Memproses..." : "Ambil Foto"}
+                            </Button>
+                          </div>
+
+                          <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>
+                            Catatan: Jika browser/device tidak mendukung preview kamera, tombol <b>Buka Kamera</b> akan otomatis membuka kamera bawaan device (mode capture).
+                          </div>
+                        </div>
+                      )}
+
+                      {!cameraPanelOpen && (
+                        <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>
+                          Klik <b>Buka Kamera</b> untuk mengambil foto menggunakan kamera perangkat.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {error && <p className="error-text">{error}</p>}
+
+                  <div style={{ marginTop: 12 }}>
+                    <Button type="submit" disabled={!file} style={isMobile ? { width: "100%" } : undefined}>
+                      Proses Klasifikasi
+                    </Button>
+                  </div>
+                </form>
+              </Card>
             </div>
-          )}
+
+            <div>
+              <Card title="Hasil Klasifikasi" subtitle="Langkah 2 dari 2">
+                {!result && <p className="muted">Belum ada hasil. Silakan unggah gambar dan klik proses.</p>}
+
+                {result && (
+                  <div className="result-block">
+                    <div className="result-row">
+                      <span className="muted">Label</span>
+                      <span className="strong">{result.label || "-"}</span>
+                    </div>
+
+                    <div className="result-row">
+                      <span className="muted">Confidence</span>
+                      <span className="strong">
+                        {typeof result.confidence === "number" ? `${(result.confidence * 100).toFixed(2)}%` : "-"}
+                      </span>
+                    </div>
+
+                    {/* ===== Deskripsi penyakit ===== */}
+                    {diseaseInfo && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 6 }}>Deskripsi: {diseaseInfo.title}</div>
+                        <p style={{ margin: 0, lineHeight: 1.5 }}>{diseaseInfo.short}</p>
+
+                        {!!(diseaseInfo.sources || []).filter((s) => s?.url).length && (
+                          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+                            Sumber:&nbsp;
+                            {(diseaseInfo.sources || [])
+                              .filter((s) => s?.url)
+                              .map((s, idx, arr) => (
+                                <span key={s.url}>
+                                  <a href={s.url} target="_blank" rel="noreferrer">
+                                    {s.label || `Referensi ${idx + 1}`}
+                                  </a>
+                                  {idx < arr.length - 1 ? ", " : ""}
+                                </span>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ===== Debug probs (tidak tampil default) ===== */}
+                    {SHOW_DEBUG_PROBS && result.probs && (
+                      <div className="prob-list" style={{ marginTop: 12 }}>
+                        {Object.entries(result.probs)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([cls, p]) => (
+                            <div
+                              key={cls}
+                              className="prob-row"
+                              style={{ display: "flex", justifyContent: "space-between" }}
+                            >
+                              <span>{cls}</span>
+                              <span>{(Number(p) * 100).toFixed(2)}%</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: 12 }}>
+                      {result.segmentation_ready ? (
+                        <Button onClick={handleGoToSegment} style={isMobile ? { width: "100%" } : undefined}>
+                          Lihat Area Terinfeksi & Estimasi Keparahan
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            onClick={handleSave}
+                            disabled={saveStatus.loading}
+                            style={isMobile ? { width: "100%" } : undefined}
+                          >
+                            {saveStatus.loading ? "Menyimpan..." : "Simpan Hasil"}
+                          </Button>
+
+                          {saveStatus.msg && (
+                            <p className="success-text" style={{ margin: 0 }}>
+                              {saveStatus.msg}
+                            </p>
+                          )}
+                          {saveStatus.err && (
+                            <p className="error-text" style={{ margin: 0 }}>
+                              {saveStatus.err}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
+          </div>
         </Card>
       </div>
     </div>
   );
-};
-
-export default ClassifyPage;
+}

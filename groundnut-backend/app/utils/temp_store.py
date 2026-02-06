@@ -3,7 +3,7 @@ import os, json, time, glob
 from typing import Optional, Dict, Any
 from app.core.config import Config
 
-VALID_EXTS = ("jpg","jpeg","png","webp","bmp","tif","tiff")
+VALID_EXTS = ("jpg","jpeg","png","webp","bmp","tif","tiff","heic")
 
 def ensure_temp_dir():
     os.makedirs(Config.TEMP_DIR, exist_ok=True)

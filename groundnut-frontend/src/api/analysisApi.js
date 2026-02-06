@@ -1,8 +1,6 @@
 // src/api/analysisApi.js
 import { getClientId } from "../utils/clientId";
 
-// const API_BASE = import.meta.env.VITE_API_BASE;
-
 async function _parseError(res, fallbackMsg) {
   let msg = fallbackMsg;
   try {
@@ -48,7 +46,7 @@ export async function classifyImage(file) {
 }
 
 // ================================
-// SEGMENTATION
+// SEGMENTATION & SEVERITY ESTIMATION
 // ================================
 // Expected backend response (tolerant):
 //  - { analysis_id, overlay_png_base64, mask_png_base64?, meta? }

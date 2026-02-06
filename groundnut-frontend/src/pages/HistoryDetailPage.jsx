@@ -40,6 +40,12 @@ function normalizeToPct(n) {
   return Math.max(0, Math.min(100, pct));
 }
 
+function fmtPct(n, digits = 2) {
+  const x = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(x)) return "-";
+  return `${x.toFixed(digits)}%`;
+}
+
 function Chip({ children, tone = "neutral", title }) {
   const tones = {
     neutral: { bg: "#f3f4f6", fg: "#374151", bd: "#e5e7eb" },
@@ -74,7 +80,8 @@ function Chip({ children, tone = "neutral", title }) {
 
 function ProbabilitiesChart({ probsList }) {
   const [showAll, setShowAll] = useState(false);
-  if (!probsList?.length) return <div style={{ fontSize: 13, color: "#6b7280" }}>Tidak ada data probabilitas.</div>;
+  if (!probsList?.length)
+    return <div style={{ fontSize: 13, color: "#6b7280" }}>Tidak ada data probabilitas.</div>;
 
   const shown = showAll ? probsList : probsList.slice(0, 5);
 
@@ -83,15 +90,26 @@ function ProbabilitiesChart({ probsList }) {
       {shown.map((item, idx) => {
         const isTop = idx === 0;
         return (
-          <div key={`${item.label}-${idx}`} style={{ padding: 10, border: "1px solid #e5e7eb", borderRadius: 12 }}>
+          <div
+            key={`${item.label}-${idx}`}
+            style={{ padding: 10, border: "1px solid #e5e7eb", borderRadius: 12 }}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
               <div style={{ fontSize: 14, fontWeight: isTop ? 900 : 800 }}>
-                {item.label} {isTop ? <span style={{ fontSize: 12, color: "#6b7280" }}>• Tertinggi</span> : null}
+                {item.label}{" "}
+                {isTop ? <span style={{ fontSize: 12, color: "#6b7280" }}>• Tertinggi</span> : null}
               </div>
               <div style={{ fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{item.pct.toFixed(2)}%</div>
             </div>
             <div style={{ marginTop: 8, height: 10, background: "#e5e7eb", borderRadius: 999 }}>
-              <div style={{ width: `${item.pct}%`, height: "100%", borderRadius: 999, background: isTop ? "#111827" : "#6b7280" }} />
+              <div
+                style={{
+                  width: `${item.pct}%`,
+                  height: "100%",
+                  borderRadius: 999,
+                  background: isTop ? "#111827" : "#6b7280",
+                }}
+              />
             </div>
           </div>
         );
@@ -106,7 +124,7 @@ function ProbabilitiesChart({ probsList }) {
   );
 }
 
-export default function HistoryDetailPage() {
+const HistoryDetailPage = () => {
   const isMobile = useIsMobile();
   const params = useParams();
   const nav = useNavigate();
@@ -164,6 +182,26 @@ export default function HistoryDetailPage() {
   const confidenceText =
     typeof data?.confidence === "number" ? `${(data.confidence * 100).toFixed(2)}%` : "-";
 
+  // =========================
+  // ✅ NEW: Severity display (sesuai revisi dosen)
+  // =========================
+  const hasSeverity = useMemo(() => {
+    const pct = data?.severity_pct;
+    return data?.seg_enabled && pct !== null && pct !== undefined && Number.isFinite(Number(pct));
+  }, [data]);
+
+  const severityPctText = useMemo(() => {
+    if (!hasSeverity) return "-";
+    return fmtPct(Number(data.severity_pct), 2);
+  }, [hasSeverity, data]);
+
+  const faoLevelText = useMemo(() => {
+    const lvl = data?.severity_fao_level;
+    if (lvl === null || lvl === undefined) return "-";
+    const n = Number(lvl);
+    return Number.isFinite(n) ? String(Math.round(n)) : "-";
+  }, [data]);
+
   return (
     <div style={{ padding: 16, maxWidth: 980, margin: "0 auto" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -187,7 +225,24 @@ export default function HistoryDetailPage() {
               <Chip tone="dark">Label: {prettyLabel(data.label)}</Chip>
               <Chip title="Keyakinan model">Confidence: {confidenceText}</Chip>
               <Chip tone={data.seg_enabled ? "good" : "neutral"}>Segmentasi: {data.seg_enabled ? "Ya" : "Tidak"}</Chip>
+
+              {/* ✅ NEW: Severity chip */}
+              {hasSeverity ? (
+                <Chip
+                  tone={Number(data.severity_pct) >= 60 ? "bad" : Number(data.severity_pct) >= 20 ? "warn" : "good"}
+                  title="Estimasi keparahan penyakit (berdasarkan area terinfeksi dibanding area daun)"
+                >
+                  Severity: {severityPctText} • FAO L{faoLevelText}
+                </Chip>
+              ) : null}
             </div>
+
+            {/* ✅ NEW: Optional detail line (tidak menghapus yang sudah ada) */}
+            {hasSeverity ? (
+              <div style={{ marginTop: 10, fontSize: 13, color: "#374151" }}>
+                Estimasi keparahan: <b>{severityPctText}</b> • Level FAO: <b>L{faoLevelText}</b>
+              </div>
+            ) : null}
           </Card>
 
           <Card>
@@ -254,4 +309,6 @@ export default function HistoryDetailPage() {
       )}
     </div>
   );
-}
+};
+
+export default HistoryDetailPage;
