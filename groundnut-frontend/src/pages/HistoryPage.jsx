@@ -1,9 +1,11 @@
 // src/pages/HistoryPage.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { fetchHistoryList } from "../api/historyApi";
+import Toast from "../components/ui/Toast";
+import ConfirmModal from "../components/ui/ConfirmModal";
+import { fetchHistoryList, deleteHistoryItem } from "../api/historyApi";
 import { formatJakartaTime } from "../utils/dateTime";
 import { useIsMobile } from "../utils/useIsMobile";
 
@@ -88,12 +90,38 @@ function SeverityBadge({ item }) {
   );
 }
 
-export default function HistoryPage() {
+const HistoryPage = () => {
   const isMobile = useIsMobile();
   const nav = useNavigate();
+  const location = useLocation();
+
+  const [toast, setToast] = useState({ open: false, type: "info", message: "" });
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
+
+  const [deletingId, setDeletingId] = useState(null);
+
+  // Modal state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  // Pagination
+  const [pageSize, setPageSize] = useState(10);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(null);
+  const [hasNext, setHasNext] = useState(false);
+
+  useEffect(() => {
+    const t = location.state?.toast;
+    if (t?.message) {
+      setToast({ open: true, type: t.type || "info", message: t.message });
+
+      // ✅ bersihkan state agar toast tidak muncul lagi saat refresh/back
+      nav(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -104,17 +132,40 @@ export default function HistoryPage() {
       setErrMsg("");
 
       try {
-        const data = await fetchHistoryList({ limit: 50, offset: 0 }, { signal: ctrl.signal });
+        const offset = (page - 1) * pageSize;
+        const data = await fetchHistoryList({ limit: pageSize, offset }, { signal: ctrl.signal });
+
         const list =
           (Array.isArray(data?.items) && data.items) ||
           (Array.isArray(data?.data?.items) && data.data.items) ||
           (Array.isArray(data) && data) ||
           [];
-        if (alive) setItems(list);
+
+        // Total bisa bervariasi tergantung bentuk response API
+        const totalFromApi =
+          (Number.isFinite(Number(data?.total)) && Number(data.total)) ||
+          (Number.isFinite(Number(data?.data?.total)) && Number(data.data.total)) ||
+          (Number.isFinite(Number(data?.count)) && Number(data.count)) ||
+          (Number.isFinite(Number(data?.data?.count)) && Number(data.data.count)) ||
+          null;
+
+        if (alive) {
+          setItems(list);
+          setTotal(totalFromApi);
+
+          // Jika total tidak tersedia, anggap masih ada halaman berikutnya bila list = pageSize
+          if (totalFromApi !== null) {
+            setHasNext(offset + list.length < totalFromApi);
+          } else {
+            setHasNext(list.length === pageSize);
+          }
+        }
       } catch (e) {
         if (e?.name === "AbortError") return;
         if (alive) {
           setItems([]);
+          setTotal(null);
+          setHasNext(false);
           setErrMsg(e?.message || "Gagal memuat history");
         }
       } finally {
@@ -126,12 +177,91 @@ export default function HistoryPage() {
       alive = false;
       ctrl.abort();
     };
-  }, []);
+  }, [page, pageSize]);
 
   const hasItems = useMemo(() => Array.isArray(items) && items.length > 0, [items]);
 
+  const totalPages = useMemo(() => {
+    if (total === null) return null;
+    const n = Number(total);
+    if (!Number.isFinite(n) || n <= 0) return 1;
+    return Math.max(1, Math.ceil(n / pageSize));
+  }, [total, pageSize]);
+
+  const canPrev = page > 1;
+  const canNext = totalPages ? page < totalPages : hasNext;
+
+  function onChangePageSize(e) {
+    const next = Number(e.target.value);
+    if (!Number.isFinite(next)) return;
+    setPageSize(next);
+    setPage(1);
+  }
+
+  // ===== Modal control =====
+  function openDeleteModal(it) {
+    if (!it?.analysis_id) return;
+    setSelectedItem(it);
+    setConfirmOpen(true);
+  }
+
+  function closeDeleteModal() {
+    // saat sedang delete, jangan bisa close (biar state aman)
+    if (deletingId) return;
+    setConfirmOpen(false);
+    setSelectedItem(null);
+  }
+
+  async function confirmDelete() {
+    const id = selectedItem?.analysis_id;
+    if (!id) return;
+
+    setDeletingId(id);
+    try {
+      await deleteHistoryItem(id);
+
+      setItems((prev) => prev.filter((x) => x.analysis_id !== id));
+      setToast({ open: true, type: "success", message: "Data berhasil dihapus." });
+
+      setConfirmOpen(false);
+      setSelectedItem(null);
+
+      // kalau page jadi kosong & page > 1, mundurkan page biar user gak lihat halaman kosong
+      setTimeout(() => {
+        setItems((curr) => {
+          if (curr.length === 0 && page > 1) {
+            setPage((p) => Math.max(1, p - 1));
+          }
+          return curr;
+        });
+      }, 0);
+    } catch (e) {
+      setToast({ open: true, type: "error", message: e?.message || "Gagal menghapus data." });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <Toast open={toast.open} type={toast.type} message={toast.message} onClose={() => setToast((v) => ({ ...v, open: false }))} />
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Hapus riwayat analisis?"
+        description={
+          selectedItem
+            ? `Item dengan label "${(selectedItem?.label ?? "-") + " - " + (selectedItem?.analysis_id ?? "-")}" akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`
+            : "Item akan dihapus permanen. Tindakan ini tidak bisa dibatalkan."
+        }
+        confirmText="Ya, hapus"
+        cancelText="Batal"
+        loading={!!deletingId}
+        destructive
+        onClose={closeDeleteModal}
+        onConfirm={confirmDelete}
+      />
+
       <Card title="Riwayat Analisis">
         {loading && <p>Memuat...</p>}
 
@@ -141,6 +271,66 @@ export default function HistoryPage() {
 
         {!loading && hasItems && (
           <>
+            {/* Toolbar: page size + pagination */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+                marginBottom: 12,
+              }}
+            >
+              {/* Kiri: page size */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 13, color: "#374151", fontWeight: 700 }}>Tampilkan</span>
+                <select value={pageSize} onChange={onChangePageSize} style={select} aria-label="Jumlah data per halaman">
+                  {[5, 10, 20, 50].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <span style={{ fontSize: 13, color: "#6b7280" }}>data / halaman</span>
+              </div>
+
+              {/* Kanan: pagination */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, color: "#6b7280" }}>
+                  Halaman <b style={{ color: "#111827" }}>{page}</b>
+                  {totalPages ? (
+                    <>
+                      {" "}
+                      / <b style={{ color: "#111827" }}>{totalPages}</b>
+                    </>
+                  ) : null}
+                  {typeof total === "number" ? (
+                    <>
+                      {" "}
+                      • Total <b style={{ color: "#111827" }}>{total}</b>
+                    </>
+                  ) : null}
+                </span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button
+                    disabled={!canPrev}
+                    style={!canPrev ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Sebelumnya
+                  </Button>
+                  <Button
+                    disabled={!canNext}
+                    style={!canNext ? { opacity: 0.6, cursor: "not-allowed" } : undefined}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Berikutnya
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {/* Mobile: list cards */}
             {isMobile ? (
               <div style={{ display: "grid", gap: 12 }}>
@@ -154,13 +344,9 @@ export default function HistoryPage() {
                       background: "#fff",
                     }}
                   >
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>
-                      {formatJakartaTime(it.created_at)} (WIB)
-                    </div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>{formatJakartaTime(it.created_at)} (WIB)</div>
 
-                    <div style={{ fontSize: 16, fontWeight: 900, marginTop: 4 }}>
-                      {it.label ?? "-"}
-                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 900, marginTop: 4 }}>{it.label ?? "-"}</div>
 
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
                       <span style={{ fontSize: 13, color: "#111827" }}>
@@ -169,9 +355,17 @@ export default function HistoryPage() {
                       <SeverityBadge item={it} />
                     </div>
 
-                    <div style={{ marginTop: 12 }}>
+                    <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
                       <Button style={{ width: "100%" }} onClick={() => nav(`/history/${it.analysis_id}`)}>
                         Lihat Detail
+                      </Button>
+
+                      <Button
+                        style={{ width: "100%", background: "#ef4444" }}
+                        disabled={deletingId === it.analysis_id}
+                        onClick={() => openDeleteModal(it)}
+                      >
+                        {deletingId === it.analysis_id ? "Menghapus..." : "Hapus"}
                       </Button>
                     </div>
                   </div>
@@ -200,7 +394,17 @@ export default function HistoryPage() {
                           <SeverityBadge item={it} />
                         </td>
                         <td style={td}>
-                          <Button onClick={() => nav(`/history/${it.analysis_id}`)}>Detail</Button>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <Button onClick={() => nav(`/history/${it.analysis_id}`)}>Detail</Button>
+
+                            <Button
+                              style={{ background: "#ef4444" }}
+                              disabled={deletingId === it.analysis_id}
+                              onClick={() => openDeleteModal(it)}
+                            >
+                              {deletingId === it.analysis_id ? "Menghapus..." : "Hapus"}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -213,7 +417,7 @@ export default function HistoryPage() {
       </Card>
     </div>
   );
-}
+};
 
 const th = {
   textAlign: "left",
@@ -227,3 +431,16 @@ const td = {
   borderBottom: "1px solid #eee",
   verticalAlign: "top",
 };
+
+const select = {
+  height: 34,
+  padding: "0 10px",
+  borderRadius: 10,
+  border: "1px solid #e5e7eb",
+  background: "#fff",
+  color: "#111827",
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+export default HistoryPage;

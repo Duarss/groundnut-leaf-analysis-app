@@ -6,6 +6,7 @@ import Button from "../components/ui/Button";
 import { segmentImage, saveAnalysis } from "../api/analysisApi";
 import { useIsMobile } from "../utils/useIsMobile";
 import ImageBox from "../components/ui/ImageBox";
+import Toast from "../components/ui/Toast";
 
 const _key = (analysisId) => `analysis_session_${analysisId}`;
 
@@ -39,6 +40,7 @@ const SegmentPage = () => {
   const [showLeafMask, setShowLeafMask] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
+  const [toast, setToast] = useState({open: false, type: "info", message: ""});
 
   const cached = useMemo(() => {
     if (!analysisId) return null;
@@ -97,6 +99,7 @@ const SegmentPage = () => {
     setLeafMaskSrc("");
     setShowLeafMask(false);
     setSaveStatus({ loading: false, msg: "", err: "" });
+    setToast({open: false, type: "info", message: ""});
   }, [analysisId]);
 
   const handleRunSegmentation = async () => {
@@ -163,9 +166,18 @@ const SegmentPage = () => {
     try {
       const res = await saveAnalysis(analysisId);
       if (!res?.saved) throw new Error(res?.error || "Gagal menyimpan hasil analisis.");
-      setSaveStatus({ loading: false, msg: "Hasil analisis berhasil disimpan.", err: "" });
+      setSaveStatus({ loading: false, msg: "", err: "" });
+
+      // pindah ke history + toast sukses ditampilkan di HistoryPage
+      navigate("/history", {
+        state: {
+          toast: { type: "success", message: "Hasil analisis berhasil disimpan." },
+        },
+      });
     } catch (e) {
-      setSaveStatus({ loading: false, msg: "", err: e.message || "Gagal menyimpan." });
+      const msg = e?.message || "Gagal menyimpan hasil analisis.";
+      setSaveStatus({ loading: false, msg: "", err: msg });
+      setToast({open: true, type: "error", message: msg});
     }
   };
 
@@ -185,6 +197,12 @@ const SegmentPage = () => {
 
   return (
     <div className="page page-analysis">
+      <Toast
+        open={toast.open}
+        type={toast.type}
+        message={toast.message}
+        onClose={() => setToast((v) => ({ ...v, open: false }))}
+      />
       <h2>Hasil Segmentasi Area Terinfeksi</h2>
       <p className="page-description">
         Halaman ini menampilkan overlay (citra asli + hasil prediksi mask) dari tahap segmentasi.
@@ -319,9 +337,6 @@ const SegmentPage = () => {
           Kembali
         </Button>
       </div>
-
-      {canShowSave && saveStatus.msg && <p style={{ marginTop: 10, color: "green" }}>{saveStatus.msg}</p>}
-      {canShowSave && saveStatus.err && <p style={{ marginTop: 10, color: "crimson" }}>{saveStatus.err}</p>}
     </div>
   );
 };

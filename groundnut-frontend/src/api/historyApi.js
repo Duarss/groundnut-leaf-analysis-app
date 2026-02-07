@@ -30,3 +30,11 @@ export function fetchHistoryDetail(analysisId, opts = {}) {
   }
   return _fetchJson(`/api/history/${encodeURIComponent(id)}`, opts);
 }
+
+export function deleteHistoryItem(analysisId, opts = {}) {
+  const id = (analysisId ?? "").toString().trim();
+  if (!id) {
+    throw new Error("analysis_id tidak valid (undefined/kosong).");
+  }
+  return _fetchJson(`/api/history/${encodeURIComponent(id)}`, { ...opts, method: "DELETE" });
+}

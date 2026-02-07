@@ -4,7 +4,7 @@ from app.utils.temp_store import find_image_path
 from app.services.classification_service import classify_uploaded_image
 from app.services.segmentation_service import segment_infected_areas
 from app.services.save_service import save_analysis
-from app.services.history_service import list_history, get_history_detail
+from app.services.history_service import list_history, get_history_detail, delete_history_item
 from app.core.config import Config
 
 bp = Blueprint("analyze", __name__)
@@ -103,6 +103,21 @@ def history_detail(analysis_id):
         return jsonify(detail), 200
     except Exception as e:
         return jsonify({"error": "Gagal mengambil detail history", "detail": str(e)}), 500
+    
+
+@bp.route("/history/<analysis_id>", methods=["DELETE"])
+def history_delete(analysis_id):
+    cid = _get_client_id()
+    if not cid:
+        return jsonify({"error": "client_id wajib (untuk multi-user tanpa login)."}), 400
+
+    try:
+        res = delete_history_item(analysis_id=analysis_id, client_id=cid, delete_files=True)
+        if not res:
+            return jsonify({"error": "History tidak ditemukan"}), 404
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({"error": "Gagal menghapus history", "detail": str(e)}), 500
 
 
 @bp.route("/temp-image/<analysis_id>", methods=["GET"])

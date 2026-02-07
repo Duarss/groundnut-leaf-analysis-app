@@ -25,7 +25,7 @@ const GuidePage = () => {
         <Card title="Alur Singkat">
           <ol className="guide-steps" style={{ paddingLeft: 18, margin: 0 }}>
             <li>
-              Buka menu <b>Klasifikasi</b> dan unggah citra daun kacang tanah.
+              Buka menu <b>Klasifikasi</b> kemudian ungguh atau foto gambar daun kacang tanah.
             </li>
             <li>
               Pastikan citra jelas, tidak blur, latar belakang kontras, dan daun
@@ -35,7 +35,7 @@ const GuidePage = () => {
               Tekan tombol <b>Klasifikasikan</b> untuk mendapatkan label penyakit.
             </li>
             <li>
-              Tekan <b>Lihat Segmentasi & Keparahan</b> untuk melihat area
+              Tekan <b>Lihat Area Terinfeksi & Estimasi Keparahan</b> untuk melihat area
               terinfeksi dan tingkat keparahan.
             </li>
             <li>
@@ -50,7 +50,7 @@ const GuidePage = () => {
             <li>Usahakan hanya satu tanaman utama yang menjadi fokus.</li>
             <li>Usahakan hanya satu jenis gejala penyakit pada daun yang difoto.</li>
             <li>Pegang kamera sejajar dengan daun agar bentuk tidak terdistorsi.</li>
-            <li>Gunakan latar belakang kontras (misal kertas putih) untuk segmentasi.</li>
+            <li>Gunakan latar belakang kontras (misalkan tanah) untuk segmentasi.</li>
             <li>Hindari objek lain yang menutupi daun utama.</li>
           </ul>
         </Card>
