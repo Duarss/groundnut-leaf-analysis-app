@@ -63,7 +63,7 @@ const GuidePage = () => {
       <Card title="Tips Mengambil Foto yang Disarankan">
         <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
           <li>Ambil foto dari jarak sedang.</li>
-          <li>Pastikan satu daun utama terlihat jelas.</li>
+          <li>Pastikan objek fokus ada pada satu tanaman utama terutama bagian daun.</li>
           <li>Hindari bayangan keras dan pantulan cahaya.</li>
           <li>Gunakan latar belakang yang tidak ramai.</li>
           <li>Manfaatkan cahaya alami bila memungkinkan.</li>
