@@ -78,12 +78,12 @@ const GuidePage = () => {
           <li>
             <b>Label Penyakit</b>  
             <br />
-            Jenis penyakit daun yang paling mirip dengan citra yang diunggah.
+            Jenis penyakit daun yang diprediksi oleh sistem dengan citra yang diunggah.
           </li>
           <li>
             <b>Keyakinan (Confidence)</b>  
             <br />
-            Menunjukkan seberapa yakin sistem terhadap hasil analisis.
+            Menunjukkan seberapa yakin sistem terhadap hasil klasifikasi.
           </li>
           <li>
             <b>Area Terinfeksi</b>  
@@ -91,7 +91,7 @@ const GuidePage = () => {
             Bagian daun yang ditandai sebagai area yang berpotensi terinfeksi.
           </li>
           <li>
-            <b>Tingkat Keparahan</b>  
+            <b>Estimasi Keparahan</b>  
             <br />
             Perkiraan tingkat kerusakan daun dari sangat ringan hingga sangat berat.
           </li>
