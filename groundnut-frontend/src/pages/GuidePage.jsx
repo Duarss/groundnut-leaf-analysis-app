@@ -1,60 +1,142 @@
 // src/pages/GuidePage.jsx
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
 import { useIsMobile } from "../utils/useIsMobile";
 
 const GuidePage = () => {
+  const nav = useNavigate();
   const isMobile = useIsMobile();
 
+  const sectionGap = isMobile ? 14 : 18;
+  const lineHeight = isMobile ? 1.7 : 1.6;
+
   return (
-    <div className="page page-guide">
-      <h2>Panduan Penggunaan Sistem</h2>
-      <p className="page-description">
-        Halaman ini menjelaskan langkah-langkah menggunakan sistem klasifikasi,
-        segmentasi, dan estimasi tingkat keparahan penyakit daun kacang tanah.
-      </p>
+    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+      {/* Tujuan */}
+      <Card title="Panduan Penggunaan Sistem">
+        <p style={{ lineHeight, marginTop: 0 }}>
+          Halaman ini membantu Anda menggunakan sistem analisis daun dengan benar,
+          mulai dari pengambilan foto hingga memahami hasil analisis yang ditampilkan.
+        </p>
+        <p style={{ lineHeight }}>
+          Panduan ini ditujukan untuk semua pengguna, termasuk yang tidak memiliki
+          latar belakang teknis.
+        </p>
+      </Card>
 
-      <div
-        className="grid-two"
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))",
-          gap: 16,
-        }}
-      >
-        <Card title="Alur Singkat">
-          <ol className="guide-steps" style={{ paddingLeft: 18, margin: 0 }}>
-            <li>
-              Buka menu <b>Klasifikasi</b> kemudian ungguh atau foto gambar daun kacang tanah.
-            </li>
-            <li>
-              Pastikan citra jelas, tidak blur, latar belakang kontras, dan daun
-              terlihat utuh.
-            </li>
-            <li>
-              Tekan tombol <b>Klasifikasikan</b> untuk mendapatkan label penyakit.
-            </li>
-            <li>
-              Tekan <b>Lihat Area Terinfeksi & Estimasi Keparahan</b> untuk melihat area
-              terinfeksi dan tingkat keparahan.
-            </li>
-            <li>
-              Hasil akan tersimpan ke <b>Riwayat Analisis</b> untuk ditinjau kembali.
-            </li>
-          </ol>
-        </Card>
+      <div style={{ height: sectionGap }} />
 
-        <Card title="Tips Pengambilan Gambar">
-          <ul className="guide-tips" style={{ paddingLeft: 18, margin: 0 }}>
-            <li>Gunakan pencahayaan alami yang cukup, hindari backlight keras.</li>
-            <li>Usahakan hanya satu tanaman utama yang menjadi fokus.</li>
-            <li>Usahakan hanya satu jenis gejala penyakit pada daun yang difoto.</li>
-            <li>Pegang kamera sejajar dengan daun agar bentuk tidak terdistorsi.</li>
-            <li>Gunakan latar belakang kontras (misalkan tanah) untuk segmentasi.</li>
-            <li>Hindari objek lain yang menutupi daun utama.</li>
-          </ul>
-        </Card>
-      </div>
+      {/* Checklist Cepat */}
+      <Card title="Checklist Cepat Sebelum Mengambil Foto">
+        <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
+          <li>✅ Foto cukup terang (tidak gelap)</li>
+          <li>✅ Daun terlihat jelas dan tidak buram</li>
+          <li>✅ Daun mengisi sebagian besar area foto</li>
+          <li>✅ Latar belakang polos dan kontras</li>
+          <li>✅ Tidak ada daun lain yang menutupi daun utama</li>
+        </ul>
+        <p style={{ color: "#6b7280", marginTop: 10 }}>
+          Checklist ini sangat berpengaruh terhadap akurasi hasil analisis.
+        </p>
+      </Card>
+
+      <div style={{ height: sectionGap }} />
+
+      {/* Alur Singkat */}
+      <Card title="Alur Singkat Penggunaan">
+        <ol style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
+          <li>Unggah atau ambil foto daun tanaman.</li>
+          <li>Sistem mengidentifikasi jenis penyakit daun.</li>
+          <li>Sistem menandai area daun yang terindikasi terinfeksi.</li>
+          <li>Sistem menampilkan tingkat keparahan kerusakan.</li>
+          <li>
+            Tekan <b>Simpan Hasil</b> untuk menyimpan ke Riwayat Analisis.
+          </li>
+        </ol>
+      </Card>
+
+      <div style={{ height: sectionGap }} />
+
+      {/* Tips Foto */}
+      <Card title="Tips Mengambil Foto yang Disarankan">
+        <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
+          <li>Ambil foto dari jarak sedang.</li>
+          <li>Pastikan satu daun utama terlihat jelas.</li>
+          <li>Hindari bayangan keras dan pantulan cahaya.</li>
+          <li>Gunakan latar belakang yang tidak ramai.</li>
+          <li>Manfaatkan cahaya alami bila memungkinkan.</li>
+        </ul>
+      </Card>
+
+      <div style={{ height: sectionGap }} />
+
+      {/* Cara Membaca Hasil */}
+      <Card title="Cara Membaca Hasil Analisis">
+        <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
+          <li>
+            <b>Label Penyakit</b>  
+            <br />
+            Jenis penyakit daun yang paling mirip dengan citra yang diunggah.
+          </li>
+          <li>
+            <b>Keyakinan (Confidence)</b>  
+            <br />
+            Menunjukkan seberapa yakin sistem terhadap hasil analisis.
+          </li>
+          <li>
+            <b>Area Terinfeksi</b>  
+            <br />
+            Bagian daun yang ditandai sebagai area yang berpotensi terinfeksi.
+          </li>
+          <li>
+            <b>Tingkat Keparahan</b>  
+            <br />
+            Perkiraan tingkat kerusakan daun dari sangat ringan hingga sangat berat.
+          </li>
+        </ul>
+      </Card>
+
+      <div style={{ height: sectionGap }} />
+
+      {/* Keterbatasan */}
+      <Card title="Kapan Hasil Bisa Kurang Akurat?">
+        <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
+          <li>Foto terlalu gelap atau buram.</li>
+          <li>Ukuran daun terlalu kecil di foto.</li>
+          <li>Beberapa daun saling menutupi.</li>
+          <li>Daun memiliki banyak gejala sekaligus.</li>
+          <li>Terdapat bayangan atau pantulan kuat.</li>
+        </ul>
+        <p style={{ color: "#6b7280" }}>
+          Jika hasil terasa kurang sesuai, silakan coba ulangi dengan foto yang lebih jelas.
+        </p>
+      </Card>
+
+      <div style={{ height: sectionGap }} />
+
+      {/* CTA */}
+      <Card>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            gap: 12,
+          }}
+        >
+          <Button onClick={() => nav("/classify")}>Mulai Analisis</Button>
+          <Button
+            onClick={() => nav("/history")}
+            style={{
+              background: "#f3f4f6",
+              color: "#111827",
+            }}
+          >
+            Lihat Riwayat Analisis
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 };
