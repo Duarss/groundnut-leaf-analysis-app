@@ -103,7 +103,6 @@ def delete_bundle(analysis_id: str):
             failed.append(p)
 
     if failed:
-        # jangan disilent lagi, biar ketahuan di console/log
         raise RuntimeError(f"Gagal menghapus temp files: {failed}")
 
 def cleanup_expired():

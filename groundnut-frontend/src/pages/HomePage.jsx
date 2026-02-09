@@ -28,7 +28,7 @@ const HomePage = () => {
           <p>
             Unggah foto daun kacang tanah, sistem akan melakukan klasifikasi
             penyakit, segmentasi area terinfeksi, dan estimasi tingkat
-            keparahan berdasarkan model CNN (EfficientNet-B4) dan U-Net.
+            keparahan.
           </p>
 
           <div
@@ -60,11 +60,11 @@ const HomePage = () => {
         <div className="hero-visual">
           <Card title="Alur Sistem">
             <ol className="hero-flow" style={{ paddingLeft: 18, margin: 0 }}>
-              <li>Unggah citra daun kacang tanah</li>
-              <li>Preprocessing & klasifikasi dengan EfficientNet-B4</li>
-              <li>Segmentasi area terinfeksi dengan U-Net</li>
-              <li>Estimasi tingkat keparahan (skala FAO)</li>
-              <li>Tinjau hasil & simpan ke riwayat</li>
+              <li>Unggah atau ambil foto daun tanaman kacang tanah.</li>
+              <li>Sistem mengidentifikasi jenis penyakit daun.</li>
+              <li>Sistem menandai area daun yang terindikasi terinfeksi.</li>
+              <li>Sistem mengestimasi tingkat keparahan penyakit.</li>
+              <li>Tekan <b>Simpan Hasil</b> untuk menyimpan ke Riwayat Analisis.</li>
             </ol>
           </Card>
         </div>

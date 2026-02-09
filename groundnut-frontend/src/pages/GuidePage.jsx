@@ -21,8 +21,7 @@ const GuidePage = () => {
           mulai dari pengambilan foto hingga memahami hasil analisis yang ditampilkan.
         </p>
         <p style={{ lineHeight }}>
-          Panduan ini ditujukan untuk semua pengguna, termasuk yang tidak memiliki
-          latar belakang teknis.
+          Panduan ini ditujukan untuk semua pengguna, demi pengalaman terbaik dan hasil analisis optimal dalam penggunaan sistem.
         </p>
       </Card>
 
@@ -31,11 +30,12 @@ const GuidePage = () => {
       {/* Checklist Cepat */}
       <Card title="Checklist Cepat Sebelum Mengambil Foto">
         <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
+          <li>✅ Objek adalah foto daun kacang tanah</li>
           <li>✅ Foto cukup terang (tidak gelap)</li>
           <li>✅ Daun terlihat jelas dan tidak buram</li>
           <li>✅ Daun mengisi sebagian besar area foto</li>
           <li>✅ Latar belakang polos dan kontras</li>
-          <li>✅ Tidak ada daun lain yang menutupi daun utama</li>
+          <li>✅ Hindari ada daun lain yang menutupi daun utama</li>
         </ul>
         <p style={{ color: "#6b7280", marginTop: 10 }}>
           Checklist ini sangat berpengaruh terhadap akurasi hasil analisis.
@@ -47,10 +47,10 @@ const GuidePage = () => {
       {/* Alur Singkat */}
       <Card title="Alur Singkat Penggunaan">
         <ol style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
-          <li>Unggah atau ambil foto daun tanaman.</li>
+          <li>Unggah atau ambil foto daun tanaman kacang tanah.</li>
           <li>Sistem mengidentifikasi jenis penyakit daun.</li>
           <li>Sistem menandai area daun yang terindikasi terinfeksi.</li>
-          <li>Sistem menampilkan tingkat keparahan kerusakan.</li>
+          <li>Sistem mengestimasi tingkat keparahan penyakit.</li>
           <li>
             Tekan <b>Simpan Hasil</b> untuk menyimpan ke Riwayat Analisis.
           </li>
@@ -78,7 +78,7 @@ const GuidePage = () => {
           <li>
             <b>Label Penyakit</b>  
             <br />
-            Jenis penyakit daun yang diprediksi oleh sistem dengan citra yang diunggah.
+            Jenis penyakit daun yang diprediksi oleh sistem dari gambar yang diunggah.
           </li>
           <li>
             <b>Keyakinan (Confidence)</b>  
@@ -86,12 +86,12 @@ const GuidePage = () => {
             Menunjukkan seberapa yakin sistem terhadap hasil klasifikasi.
           </li>
           <li>
-            <b>Area Terinfeksi</b>  
+            <b>Segmentasi Area Daun Terinfeksi</b>  
             <br />
             Bagian daun yang ditandai sebagai area yang berpotensi terinfeksi.
           </li>
           <li>
-            <b>Estimasi Keparahan</b>  
+            <b>Estimasi Tingkat Keparahan</b>  
             <br />
             Perkiraan tingkat kerusakan daun dari sangat ringan hingga sangat berat.
           </li>

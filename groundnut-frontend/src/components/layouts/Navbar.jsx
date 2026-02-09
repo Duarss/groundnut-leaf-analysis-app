@@ -22,7 +22,7 @@ const Navbar = () => {
           </span>
           <div className="brand-text">
             <div className="brand-title">Groundnut Leaf Analyzer</div>
-            <div className="brand-subtitle">Classify + Segment + Estimate Severity + Monitor</div>
+            <div className="brand-subtitle">Sistem Analisis Berbasis AI</div>
           </div>
         </div>
 
