@@ -107,7 +107,7 @@ const HistoryPage = () => {
   const [selectedItem, setSelectedItem] = useState(null);
 
   // Pagination
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(null);
   const [hasNext, setHasNext] = useState(false);
@@ -116,8 +116,6 @@ const HistoryPage = () => {
     const t = location.state?.toast;
     if (t?.message) {
       setToast({ open: true, type: t.type || "info", message: t.message });
-
-      // ✅ bersihkan state agar toast tidak muncul lagi saat refresh/back
       nav(location.pathname, { replace: true, state: {} });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -6,6 +6,7 @@ import Button from "../components/ui/Button";
 import { classifyImage, saveAnalysis } from "../api/analysisApi";
 import { useIsMobile } from "../utils/useIsMobile";
 import ImageBox from "../components/ui/ImageBox";
+import Toast from "../components/ui/Toast";
 
 // ====== Disease description (shown to user instead of probs_json) ======
 // Catatan: link sumber tetap di komentar (untuk catatan ilmiah).
@@ -102,8 +103,8 @@ const ClassifyPage = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
+  const [toast, setToast] = useState({open: false, type: "info", message: ""});
 
-  // ✅ NEW: processing state for "Proses Klasifikasi" button label
   const [classifyBusy, setClassifyBusy] = useState(false);
 
   // Deskripsi penyakit ditampilkan ke user
@@ -178,6 +179,7 @@ const ClassifyPage = () => {
       setCameraPanelOpen(true);
     } catch (e) {
       setCameraErr(e?.message || "Gagal membuka kamera.");
+      setToast({open: true, type: "error", message: e?.message || "Gagal membuka kamera."});
     } finally {
       setCameraBusy(false);
     }
@@ -307,7 +309,9 @@ const ClassifyPage = () => {
     setSaveStatus({ loading: false, msg: "", err: "" });
 
     if (!file) {
-      setError("Silakan pilih gambar terlebih dahulu.");
+      const msg = "Silakan pilih gambar terlebih dahulu.";
+      setError(msg);
+      setToast({ open: true, type: "error", message: msg });
       return;
     }
 
@@ -332,10 +336,19 @@ const ClassifyPage = () => {
 
     setSaveStatus({ loading: true, msg: "", err: "" });
     try {
-      const data = await saveAnalysis(result.analysis_id);
-      setSaveStatus({ loading: false, msg: data?.message || "Berhasil disimpan.", err: "" });
+      const res = await saveAnalysis(result.analysis_id);
+      if (!res?.saved) throw new Error(res?.error || "Gagal menyimpan hasil analisis.");
+      setSaveStatus({ loading: false, msg: "", err: "" });
+
+      navigate("/history", {
+        state: {
+          toast: {type: "success", message: "Hasil analisis berhasil disimpan."}
+        },
+      })
     } catch (e) {
-      setSaveStatus({ loading: false, msg: "", err: e?.message || "Gagal menyimpan." });
+      const msg = e?.message || "Gagal menyimpan hasil analisis.";
+      setSaveStatus({ loading: false, msg: "", err: msg });
+      setToast({open: true, type: "error", message: msg});
     }
   };
 
@@ -390,10 +403,16 @@ const ClassifyPage = () => {
   return (
     <div className="page">
       <div className="container">
-        <Card title="Klasifikasi Penyakit Daun Kacang Tanah" subtitle="Unggah citra daun untuk memulai analisis">
+        <Toast
+          open={toast.open}
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast((v) => ({ ...v, open: false }))}
+        />
+        <Card title="Klasifikasi Penyakit Daun Kacang Tanah" subtitle="Unggah/ambil foto daun untuk memulai analisis">
           <div className="grid-2">
             <div>
-              <Card title="Input Citra" subtitle="Langkah 1 dari 2">
+              <Card title="Input" subtitle="Langkah 1 dari 2">
                 <form onSubmit={handleSubmit} className="upload-form">
                   {/* hidden capture input (fallback kamera device) */}
                   <input
@@ -415,7 +434,7 @@ const ClassifyPage = () => {
                       }}
                       style={modeBtnStyle(inputMode === "upload")}
                     >
-                      Upload Foto
+                      Unggah
                     </Button>
                     <Button
                       type="button"
@@ -548,7 +567,7 @@ const ClassifyPage = () => {
             </div>
 
             {/* =======================
-                ✅ Revisi layout Langkah 2
+                Layout Langkah 2
                 ======================= */}
             <div>
               <Card title="Hasil Klasifikasi" subtitle="Langkah 2 dari 2">
@@ -655,7 +674,6 @@ const ClassifyPage = () => {
                       </div>
                     )}
 
-                    {/* CTA */}
                     <div style={{ display: "grid", gap: 8 }}>
                       {result.segmentation_ready ? (
                         <Button onClick={handleGoToSegment} style={isMobile ? { width: "100%" } : undefined}>
@@ -668,7 +686,7 @@ const ClassifyPage = () => {
                             disabled={saveStatus.loading || classifyBusy}
                             style={isMobile ? { width: "100%" } : undefined}
                           >
-                            {saveStatus.loading ? "Menyimpan..." : "Simpan Hasil"}
+                            {saveStatus.loading ? "Menyimpan..." : "Simpan Hasil Analisis"}
                           </Button>
 
                           {saveStatus.msg && (

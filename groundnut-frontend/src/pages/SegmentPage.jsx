@@ -28,7 +28,7 @@ const SegmentPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [originalSrc, setOriginalSrc] = useState(""); // ✅ sekarang di-load dari backend tmp
+  const [originalSrc, setOriginalSrc] = useState("");
   const [overlaySrc, setOverlaySrc] = useState("");
   const [maskSrc, setMaskSrc] = useState("");
 
@@ -51,7 +51,6 @@ const SegmentPage = () => {
   const diseaseLabel = cached?.label || cached?.result?.label || "";
   const confidence = cached?.confidence ?? cached?.result?.confidence;
 
-  // ✅ ambil citra original langsung dari tmp_uploads via backend
   useEffect(() => {
     if (!analysisId) return;
 

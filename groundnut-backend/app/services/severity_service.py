@@ -3,7 +3,6 @@ import numpy as np
 from app.core.config import Config
 from app.ml.severity.leaf_mask.predict import predict_leaf_mask
 
-
 def _parse_bins(s: str):
     """
     Expect string "0,5,20,40,60,100"
