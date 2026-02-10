@@ -43,7 +43,7 @@ const SegmentPage = () => {
   const [sadScheme, setSadScheme] = useState("");
   const [sadClassIndex, setSadClassIndex] = useState(null);
   const [sadRange, setSadRange] = useState(null);
-  const [sadMidpoint, setSadMidpoint] = useState(null);
+  // const [sadMidpoint, setSadMidpoint] = useState(null);
 
   const [leafMaskSrc, setLeafMaskSrc] = useState("");
   const [showLeafMask, setShowLeafMask] = useState(false);
@@ -124,7 +124,7 @@ const SegmentPage = () => {
     setSadScheme("");
     setSadClassIndex(null);
     setSadRange(null);
-    setSadMidpoint(null);
+    // setSadMidpoint(null);
 
     setLeafMaskSrc("");
     setShowLeafMask(false);
@@ -175,8 +175,8 @@ const SegmentPage = () => {
         if (Array.isArray(rng) && rng.length === 2) setSadRange([Number(rng[0]), Number(rng[1])]);
         else setSadRange(null);
 
-        const mid = _numOrNull(sad?.midpoint_pct ?? sad?.midpoint);
-        setSadMidpoint(mid);
+        // const mid = _numOrNull(sad?.midpoint_pct ?? sad?.midpoint);
+        // setSadMidpoint(mid);
 
         // leaf mask (opsional)
         const leafMaskB64 = sev?.leaf_mask_png_base64;
@@ -190,7 +190,7 @@ const SegmentPage = () => {
         setSadScheme("");
         setSadClassIndex(null);
         setSadRange(null);
-        setSadMidpoint(null);
+        // setSadMidpoint(null);
 
         setLeafMaskSrc("");
         setShowLeafMask(false);
@@ -232,11 +232,10 @@ const SegmentPage = () => {
   const sadText = useMemo(() => {
     if (sadClassIndex == null || Number.isNaN(sadClassIndex)) return "-";
     const cls = `Kelas SAD ${Math.round(sadClassIndex)}`;
-    const range =
-      Array.isArray(sadRange) && sadRange.length === 2 ? ` (rentang ${sadRange[0]}–${sadRange[1]}%)` : "";
-    const mid = sadMidpoint != null ? ` • midpoint ${sadMidpoint.toFixed(1)}%` : "";
-    return `${cls}${range}${mid}`;
-  }, [sadClassIndex, sadRange, sadMidpoint]);
+    const range = Array.isArray(sadRange) && sadRange.length === 2 ? ` (rentang ${sadRange[0]}–${sadRange[1]}%)` : "";
+    // const mid = sadMidpoint != null ? ` • midpoint ${sadMidpoint.toFixed(1)}%` : "";
+    return `${cls}${range}`;
+  }, [sadClassIndex, sadRange]);
 
   const canShowSave = Boolean(overlaySrc);
 
@@ -255,7 +254,7 @@ const SegmentPage = () => {
       </p>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <span>ID Analisis: {analysisId}</span>
+        <span>ID: {analysisId}</span>
         {diseaseLabel && <span>Penyakit: {diseaseLabel}</span>}
         {typeof confidence === "number" && <span>Keyakinan: {(confidence * 100).toFixed(1)}%</span>}
       </div>
@@ -271,7 +270,7 @@ const SegmentPage = () => {
               <div style={{ fontSize: 22, fontWeight: 700 }}>{severityText}</div>
             </div>
             <div>
-              <div style={{ fontSize: 13, opacity: 0.8 }}>SAD</div>
+              <div style={{ fontSize: 13, opacity: 0.8 }}>Standard Area Diagrams (SAD)</div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>{sadText}</div>
             </div>
           </div>
