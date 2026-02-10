@@ -1,9 +1,40 @@
 // src/pages/GuidePage.jsx
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { useIsMobile } from "../utils/useIsMobile";
+
+function AccordionSection({ id, title, isOpen, onToggle, children, isMobile }) {
+  return (
+    <Card title={title}>
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          marginBottom: isOpen ? 10 : 0,
+        }}
+      >
+        <div style={{ fontSize: 13, color: "#6b7280" }}>
+          {isOpen ? "Klik untuk menutup" : "Klik untuk membuka"}
+        </div>
+
+        <Button
+          variant="secondary"
+          onClick={() => onToggle(id)}
+          style={isMobile ? { width: "100%" } : undefined}
+        >
+          {isOpen ? "Tutup" : "Buka"}
+        </Button>
+      </div>
+
+      {isOpen ? <div>{children}</div> : null}
+    </Card>
+  );
+}
 
 const GuidePage = () => {
   const nav = useNavigate();
@@ -12,111 +43,241 @@ const GuidePage = () => {
   const sectionGap = isMobile ? 14 : 18;
   const lineHeight = isMobile ? 1.7 : 1.6;
 
+  const items = useMemo(
+    () => [
+      {
+        id: "tujuan",
+        title: "Panduan Penggunaan Sistem",
+        content: (
+          <>
+            <p style={{ lineHeight, marginTop: 0 }}>
+              Panduan ini membantu Anda menggunakan sistem analisis daun dengan benar, mulai dari
+              cara mengambil foto sampai memahami hasil yang ditampilkan.
+            </p>
+            <p style={{ lineHeight, marginBottom: 0 }}>
+              Agar hasil lebih optimal, ikuti checklist dan tips foto di bawah sebelum melakukan
+              analisis.
+            </p>
+          </>
+        ),
+      },
+      {
+        id: "checklist",
+        title: "Checklist Cepat Sebelum Mengambil Foto",
+        content: (
+          <>
+            <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
+              <li>✅ Objek adalah foto daun kacang tanah</li>
+              <li>✅ Daun terlihat jelas (tidak buram) dan cukup terang</li>
+              <li>✅ Daun mengisi sebagian besar area foto</li>
+              <li>✅ Latar belakang polos/kontras, tidak ramai</li>
+              <li>✅ Hindari ada daun lain yang menutupi daun utama</li>
+              <li>✅ Hindari bayangan keras dan pantulan cahaya</li>
+            </ul>
+            <p style={{ color: "#6b7280", marginTop: 10, marginBottom: 0 }}>
+              Checklist ini sangat berpengaruh terhadap akurasi klasifikasi, segmentasi, dan estimasi
+              keparahan.
+            </p>
+          </>
+        ),
+      },
+      {
+        id: "alur",
+        title: "Alur Singkat Penggunaan",
+        content: (
+          <ol style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0, marginBottom: 0 }}>
+            <li>Unggah atau ambil foto daun kacang tanah.</li>
+            <li>Sistem memprediksi label penyakit (hasil klasifikasi) beserta nilai keyakinan.</li>
+            <li>Jika terindikasi penyakit tertentu, lanjutkan segmentasi untuk menandai area terinfeksi.</li>
+            <li>Sistem menghitung keparahan sebagai persentase (area terinfeksi dibanding area daun).</li>
+            <li>Sistem memetakan persentase ke kelas SAD untuk membantu interpretasi.</li>
+            <li>
+              Tekan <b>Simpan Hasil</b> untuk menyimpan ke Riwayat Analisis.
+            </li>
+          </ol>
+        ),
+      },
+      {
+        id: "tips",
+        title: "Tips Mengambil Foto yang Disarankan",
+        content: (
+          <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0, marginBottom: 0 }}>
+            <li>Ambil foto dari jarak sedang, jangan terlalu jauh.</li>
+            <li>Pastikan fokus kamera tajam pada daun (bukan background).</li>
+            <li>Gunakan cahaya alami bila memungkinkan.</li>
+            <li>Usahakan background kontras agar daun mudah dipisahkan dari latar.</li>
+            <li>Ambil lebih dari 1 foto bila perlu (pilih yang paling jelas).</li>
+          </ul>
+        ),
+      },
+      {
+        id: "sad",
+        title: "Apa itu SAD (Standard Area Diagrams)?",
+        content: (
+          <>
+            <p style={{ lineHeight, marginTop: 0 }}>
+              <b>SAD (Standard Area Diagrams)</b> adalah pendekatan visual yang membantu menafsirkan
+              <b> persentase keparahan</b> (area terinfeksi dibanding area daun) dengan membandingkannya
+              terhadap <i>diagram/kelas referensi</i> yang digunakan luas dalam penilaian penyakit tanaman.
+            </p>
+            <p style={{ lineHeight, marginBottom: 0 }}>
+              Di sistem ini, keparahan ditampilkan sebagai <b>persentase</b> dan <b>kelas SAD</b>{" "}
+              (misalnya skema Horsfall–Barratt 12 kelas) agar interpretasi lebih konsisten dan transparan.
+            </p>
+
+            <div style={{ marginTop: 10, fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>
+              Referensi bacaan:
+              <ul style={{ marginTop: 6, paddingLeft: 18, marginBottom: 0 }}>
+                <li>
+                  Ringkasan ilmiah tentang SAD (Phytopathology, 2017):{" "}
+                  <a
+                    href="https://doi.org/10.1094/PHYTO-02-17-0069-FI"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    DOI: 10.1094/PHYTO-02-17-0069-FI
+                  </a>
+                </li>
+                <li>
+                  Halaman publikasi (USDA ARS):{" "}
+                  <a
+                    href="https://www.ars.usda.gov/research/publications/publication/?seqNo115=342880"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    USDA ARS Publication
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </>
+        ),
+      },
+      {
+        id: "baca",
+        title: "Cara Membaca Hasil Analisis",
+        content: (
+          <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0, marginBottom: 0 }}>
+            <li>
+              <b>Label Penyakit</b>
+              <br />
+              Hasil klasifikasi jenis penyakit dari foto daun.
+            </li>
+            <li>
+              <b>Keyakinan (Confidence)</b>
+              <br />
+              Seberapa yakin model terhadap label yang diprediksi.
+            </li>
+            <li>
+              <b>Segmentasi Area Terinfeksi</b>
+              <br />
+              Visualisasi area yang diprediksi terinfeksi pada daun (overlay).
+            </li>
+            <li>
+              <b>Estimasi Keparahan</b>
+              <br />
+              Ditampilkan sebagai <b>persentase</b> (area terinfeksi dibanding area daun) dan <b>kelas SAD</b>{" "}
+              untuk membantu interpretasi tingkat keparahan secara visual.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        id: "limitasi",
+        title: "Kapan Hasil Bisa Kurang Akurat?",
+        content: (
+          <>
+            <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
+              <li>Foto terlalu gelap atau buram.</li>
+              <li>Daun terlalu kecil di foto.</li>
+              <li>Banyak daun saling menutupi.</li>
+              <li>Background terlalu ramai atau warnanya mirip daun.</li>
+              <li>Ada pantulan cahaya kuat/bayangan keras.</li>
+            </ul>
+            <p style={{ color: "#6b7280", marginBottom: 0 }}>
+              Jika hasil kurang sesuai, ulangi dengan foto yang lebih jelas dan mengikuti checklist.
+            </p>
+          </>
+        ),
+      },
+    ],
+    [lineHeight]
+  );
+
+  const allIds = useMemo(() => items.map((x) => x.id), [items]);
+
+  // Desktop initial: open all
+  const [openAll, setOpenAll] = useState(!isMobile);
+
+  // Mobile initial: buka "tujuan"
+  // Desktop saat openAll=true, openIds tidak berpengaruh (tapi tetap dipakai saat keluar dari openAll)
+  const [openIds, setOpenIds] = useState(isMobile ? ["tujuan"] : []);
+
+  const isSectionOpen = (id) => (openAll ? true : openIds.includes(id));
+
+  const onToggle = (id) => {
+    // Desktop: jika sedang openAll, klik salah satu section => keluar dari openAll dan close/open section itu secara natural
+    if (!isMobile && openAll) {
+      setOpenAll(false);
+      // semua tadinya terbuka, jadi toggle berarti "tutup section id" (yang lain tetap terbuka)
+      setOpenIds(allIds.filter((x) => x !== id));
+      return;
+    }
+
+    setOpenIds((prev) => {
+      if (isMobile) {
+        return prev[0] === id ? [] : [id];
+      }
+      // desktop: multi-open
+      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    });
+  };
+
+  const toggleOpenAllDesktop = () => {
+    setOpenAll((prev) => {
+      const next = !prev;
+
+      if (next) {
+        // masuk openAll: tidak perlu ubah openIds
+        return true;
+      }
+
+      // keluar openAll: set default biar tidak kosong
+      setOpenIds(["tujuan"]);
+      return false;
+    });
+  };
+
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      {/* Tujuan */}
-      <Card title="Panduan Penggunaan Sistem">
-        <p style={{ lineHeight, marginTop: 0 }}>
-          Halaman ini membantu Anda menggunakan sistem analisis daun dengan benar,
-          mulai dari pengambilan foto hingga memahami hasil analisis yang ditampilkan.
-        </p>
-        <p style={{ lineHeight }}>
-          Panduan ini ditujukan untuk semua pengguna, demi pengalaman terbaik dan hasil analisis optimal dalam penggunaan sistem.
-        </p>
-      </Card>
+      {/* Desktop-only: Buka semua / Tutup semua */}
+      {!isMobile && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <Button variant="secondary" onClick={toggleOpenAllDesktop}>
+            {openAll ? "Tutup semua" : "Buka semua"}
+          </Button>
+        </div>
+      )}
+
+      {items.map((it, idx) => (
+        <React.Fragment key={it.id}>
+          <AccordionSection
+            id={it.id}
+            title={it.title}
+            isOpen={isSectionOpen(it.id)}
+            onToggle={onToggle}
+            isMobile={isMobile}
+          >
+            {it.content}
+          </AccordionSection>
+
+          {idx < items.length - 1 ? <div style={{ height: sectionGap }} /> : null}
+        </React.Fragment>
+      ))}
 
       <div style={{ height: sectionGap }} />
 
-      {/* Checklist Cepat */}
-      <Card title="Checklist Cepat Sebelum Mengambil Foto">
-        <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
-          <li>✅ Objek adalah foto daun kacang tanah</li>
-          <li>✅ Foto cukup terang (tidak gelap)</li>
-          <li>✅ Daun terlihat jelas dan tidak buram</li>
-          <li>✅ Daun mengisi sebagian besar area foto</li>
-          <li>✅ Latar belakang polos dan kontras</li>
-          <li>✅ Hindari ada daun lain yang menutupi daun utama</li>
-        </ul>
-        <p style={{ color: "#6b7280", marginTop: 10 }}>
-          Checklist ini sangat berpengaruh terhadap akurasi hasil analisis.
-        </p>
-      </Card>
-
-      <div style={{ height: sectionGap }} />
-
-      {/* Alur Singkat */}
-      <Card title="Alur Singkat Penggunaan">
-        <ol style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
-          <li>Unggah atau ambil foto daun tanaman kacang tanah.</li>
-          <li>Sistem mengidentifikasi jenis penyakit daun.</li>
-          <li>Sistem menandai area daun yang terindikasi terinfeksi.</li>
-          <li>Sistem mengestimasi tingkat keparahan penyakit.</li>
-          <li>
-            Tekan <b>Simpan Hasil</b> untuk menyimpan ke Riwayat Analisis.
-          </li>
-        </ol>
-      </Card>
-
-      <div style={{ height: sectionGap }} />
-
-      {/* Tips Foto */}
-      <Card title="Tips Mengambil Foto yang Disarankan">
-        <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
-          <li>Ambil foto dari jarak sedang.</li>
-          <li>Pastikan objek fokus ada pada satu tanaman utama terutama bagian daun.</li>
-          <li>Hindari bayangan keras dan pantulan cahaya.</li>
-          <li>Gunakan latar belakang yang tidak ramai.</li>
-          <li>Manfaatkan cahaya alami bila memungkinkan.</li>
-        </ul>
-      </Card>
-
-      <div style={{ height: sectionGap }} />
-
-      {/* Cara Membaca Hasil */}
-      <Card title="Cara Membaca Hasil Analisis">
-        <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
-          <li>
-            <b>Label Penyakit</b>  
-            <br />
-            Jenis penyakit daun yang diprediksi oleh sistem dari gambar yang diunggah.
-          </li>
-          <li>
-            <b>Keyakinan (Confidence)</b>  
-            <br />
-            Menunjukkan seberapa yakin sistem terhadap hasil klasifikasi.
-          </li>
-          <li>
-            <b>Segmentasi Area Daun Terinfeksi</b>  
-            <br />
-            Bagian daun yang ditandai sebagai area yang berpotensi terinfeksi.
-          </li>
-          <li>
-            <b>Estimasi Tingkat Keparahan</b>  
-            <br />
-            Perkiraan tingkat kerusakan daun dari sangat ringan hingga sangat berat.
-          </li>
-        </ul>
-      </Card>
-
-      <div style={{ height: sectionGap }} />
-
-      {/* Keterbatasan */}
-      <Card title="Kapan Hasil Bisa Kurang Akurat?">
-        <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
-          <li>Foto terlalu gelap atau buram.</li>
-          <li>Ukuran daun terlalu kecil di foto.</li>
-          <li>Beberapa daun saling menutupi.</li>
-          <li>Daun memiliki banyak gejala sekaligus.</li>
-          <li>Terdapat bayangan atau pantulan kuat.</li>
-        </ul>
-        <p style={{ color: "#6b7280" }}>
-          Jika hasil terasa kurang sesuai, silakan coba ulangi dengan foto yang lebih jelas.
-        </p>
-      </Card>
-
-      <div style={{ height: sectionGap }} />
-
-      {/* CTA */}
+      {/* CTA (selalu tampil) */}
       <Card>
         <div
           style={{
