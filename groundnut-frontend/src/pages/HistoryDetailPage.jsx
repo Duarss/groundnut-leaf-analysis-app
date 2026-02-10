@@ -273,10 +273,15 @@ const HistoryDetailPage = () => {
       {!loading && err && <div style={{ marginTop: 12, color: "crimson" }}>{err}</div>}
 
       {!loading && data && (
-        <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
-          <Card>
-            <div style={{ fontSize: 12, color: "#6b7280" }}>{formatJakartaTime(data.created_at)} (WIB)</div>
-            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 4 }}>{prettyLabel(data.label)}</div>
+        <div style={{ marginTop: 8, display: "grid", gap: 12 }}>
+          <Card
+            title={
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                {`${formatJakartaTime(data.created_at)} (WIB)`}
+              </span>
+            }
+          >
+            <div style={{ fontSize: 20, fontWeight: 900 }}>{prettyLabel(data.label)}</div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
               {/* <Chip tone="dark">Label: {prettyLabel(data.label)}</Chip> */}
