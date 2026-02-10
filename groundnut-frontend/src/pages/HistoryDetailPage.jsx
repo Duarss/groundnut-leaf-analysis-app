@@ -51,9 +51,8 @@ function numOrNull(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-// ✅ Deskripsi penyakit ringkas (untuk UI).
 // Catatan: Ini ringkasan gejala umum dari sumber tepercaya (lihat catatan sitasi di chat).
-const DISEASE_DESC = {
+const LABEL_DESC = {
   "ALTERNARIA LEAF SPOT":
     "Umumnya muncul bercak cokelat hingga kehitaman pada daun, sering membentuk pola cincin konsentris (seperti ‘target spot’). Pada serangan berat dapat mempercepat penuaan/kerontokan daun.",
   "LEAF SPOT (EARLY AND LATE)":
@@ -174,7 +173,7 @@ const HistoryDetailPage = () => {
   }, [analysisId]);
 
   const labelNorm = useMemo(() => prettyLabel(data?.label).toUpperCase(), [data]);
-  const labelDesc = useMemo(() => DISEASE_DESC[labelNorm] || "Deskripsi untuk label ini belum tersedia.", [labelNorm]);
+  const labelDesc = useMemo(() => LABEL_DESC[labelNorm] || "Deskripsi untuk label ini belum tersedia.", [labelNorm]);
 
   const probsObj = useMemo(() => parseProbsAny(data?.probs_json), [data]);
 
@@ -280,7 +279,7 @@ const HistoryDetailPage = () => {
             <div style={{ fontSize: 20, fontWeight: 900, marginTop: 4 }}>{prettyLabel(data.label)}</div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-              <Chip tone="dark">Label: {prettyLabel(data.label)}</Chip>
+              {/* <Chip tone="dark">Label: {prettyLabel(data.label)}</Chip> */}
               <Chip title="Keyakinan model">Keyakinan Prediksi: {confidenceText}</Chip>
               <Chip tone={data.seg_enabled ? "good" : "neutral"}>Segmentasi: {data.seg_enabled ? "Ya" : "Tidak"}</Chip>
 
@@ -297,8 +296,8 @@ const HistoryDetailPage = () => {
             </div>
           </Card>
 
-          {/* ✅ NEW: Deskripsi penyakit */}
-          <Card title="Deskripsi Penyakit">
+          {/* Deskripsi Label */}
+          <Card title="Deskripsi Label">
             <div style={{ fontSize: 14, color: "#111827", lineHeight: 1.6 }}>
               {labelDesc}
             </div>

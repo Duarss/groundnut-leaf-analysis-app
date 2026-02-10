@@ -8,9 +8,8 @@ import { useIsMobile } from "../utils/useIsMobile";
 import ImageBox from "../components/ui/ImageBox";
 import Toast from "../components/ui/Toast";
 
-// ✅ Deskripsi penyakit ringkas (SAMA seperti di HistoryDetailPage.jsx)
 // Catatan: Ini ringkasan gejala umum untuk membantu interpretasi hasil model.
-const DISEASE_DESC = {
+const LABEL_DESC = {
   "ALTERNARIA LEAF SPOT":
     "Umumnya muncul bercak cokelat hingga kehitaman pada daun, sering membentuk pola cincin konsentris (seperti ‘target spot’). Pada serangan berat dapat mempercepat penuaan/kerontokan daun.",
   "LEAF SPOT (EARLY AND LATE)":
@@ -84,10 +83,10 @@ const ClassifyPage = () => {
 
   const [classifyBusy, setClassifyBusy] = useState(false);
 
-  // ✅ Deskripsi penyakit (SAMA pola dengan HistoryDetailPage.jsx)
+  // Deskripsi Label (SAMA pola dengan HistoryDetailPage.jsx)
   const labelNorm = useMemo(() => _normLabelForInfo(result?.label), [result?.label]);
   const labelDesc = useMemo(
-    () => (labelNorm ? DISEASE_DESC[labelNorm] || "Deskripsi untuk label ini belum tersedia." : ""),
+    () => (labelNorm ? LABEL_DESC[labelNorm] || "Deskripsi untuk label ini belum tersedia." : ""),
     [labelNorm]
   );
 
@@ -602,10 +601,10 @@ const ClassifyPage = () => {
                       </span>
                     </div>
 
-                    {/* ✅ Deskripsi penyakit (SAMA seperti HistoryDetailPage.jsx) */}
+                    {/* Deskripsi Label */}
                     {labelNorm && (
                       <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fff" }}>
-                        <div style={{ fontWeight: 900, marginBottom: 8 }}>Deskripsi Penyakit</div>
+                        <div style={{ fontWeight: 900, marginBottom: 8 }}>Deskripsi Label</div>
                         <div style={{ fontSize: 14, color: "#111827", lineHeight: 1.6 }}>
                           {labelDesc}
                         </div>

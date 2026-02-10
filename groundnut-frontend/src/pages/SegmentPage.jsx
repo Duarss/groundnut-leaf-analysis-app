@@ -328,7 +328,7 @@ const SegmentPage = () => {
             </p>
           )}
 
-          {/* ✅ Loading anim: SAMA seperti ClassifyPage.jsx */}
+          {/* Loading */}
           {!overlaySrc && isLoading && (
             <div style={{ padding: 12, border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -410,7 +410,7 @@ const SegmentPage = () => {
         </Button>
       </div>
 
-      {/* ✅ anim keyframes (inline) - sama seperti ClassifyPage */}
+      {/* Loading anim keyframes (inline) */}
       <style>{`
         @keyframes pulse {
           0% { transform: translateX(-20%); opacity: .65; }
