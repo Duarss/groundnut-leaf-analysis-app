@@ -99,7 +99,9 @@ def list_history(client_id: str, limit: int = 50, offset: int = 0):
                     "confidence": r.confidence,
                     "seg_enabled": r.seg_enabled,
                     "severity_pct": r.severity_pct,
-                    "severity_fao_level": r.severity_fao_level,
+                    # SAD ringkas untuk HistoryPage
+                    "sad_class_index": r.sad_class_index,
+                    "sad_midpoint_pct": r.sad_midpoint_pct,
                 }
             )
 
@@ -136,8 +138,17 @@ def get_history_detail(analysis_id: str, client_id: str) -> dict:
             "probs_json": row.probs_json,
             "seg_enabled": row.seg_enabled,
             "seg_overlay_path": row.seg_overlay_path,
-            "severity_fao_level": row.severity_fao_level,
             "severity_pct": row.severity_pct,
+
+            # SAD lengkap untuk detail
+            "sad": {
+                "scheme": row.sad_scheme,
+                "class_index": row.sad_class_index,
+                "midpoint_pct": row.sad_midpoint_pct,
+                "range_pct": [row.sad_range_low, row.sad_range_high]
+                if (row.sad_range_low is not None and row.sad_range_high is not None)
+                else None,
+            } if (row.sad_scheme or row.sad_class_index is not None) else None,
         }
     finally:
         db.close()

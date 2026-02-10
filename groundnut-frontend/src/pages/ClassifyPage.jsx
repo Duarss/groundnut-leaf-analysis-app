@@ -8,42 +8,19 @@ import { useIsMobile } from "../utils/useIsMobile";
 import ImageBox from "../components/ui/ImageBox";
 import Toast from "../components/ui/Toast";
 
-// ====== Disease description (shown to user instead of probs_json) ======
-// Catatan: link sumber tetap di komentar (untuk catatan ilmiah).
-// - Groundnut rosette disease (CABI): https://www.cabi.org/isc/datasheet/22097
-// - Peanut rust (UF/IFAS EDIS): https://edis.ifas.ufl.edu/publication/PP288
-// - Peanut leaf spots (early & late) review: https://www.mdpi.com/2076-2607/11/8/2158
-const DISEASE_INFO = {
-  HEALTHY: {
-    title: "HEALTHY (Daun Sehat)",
-    short:
-      "Daun tampak normal tanpa gejala bercak/lesi khas penyakit. Tetap lakukan perawatan budidaya yang baik (monitoring rutin, nutrisi seimbang, sanitasi lahan).",
-    sources: [{ label: "Catatan umum budidaya", url: "" }],
-  },
-  "ALTERNARIA LEAF SPOT": {
-    title: "ALTERNARIA LEAF SPOT",
-    short:
-      "Penyakit jamur yang umumnya memunculkan bercak nekrotik cokelat–kehitaman, kadang dengan pola konsentris/‘target spot’. Bercak dapat melebar dan menyebabkan klorosis/kerontokan daun pada infeksi berat.",
-    sources: [{ label: "Literatur Alternaria pada groundnut", url: "" }],
-  },
-  "LEAF SPOT (EARLY AND LATE)": {
-    title: "LEAF SPOT (EARLY & LATE)",
-    short:
-      "Kelompok penyakit bercak daun pada kacang tanah (early leaf spot & late leaf spot) yang menyebabkan bercak pada daun, mengurangi luas fotosintesis, dan pada kasus berat memicu defoliasi sehingga menurunkan hasil.",
-    sources: [{ label: "Review ilmiah leaf spot", url: "https://www.mdpi.com/2076-2607/11/8/2158" }],
-  },
-  ROSETTE: {
-    title: "ROSETTE",
-    short:
-      "Groundnut rosette disease adalah penyakit virus kompleks (sering terkait vektor aphid) yang menyebabkan pertumbuhan kerdil, rosetting (daun mengumpul/berbentuk roset), klorosis, dan penurunan hasil yang signifikan.",
-    sources: [{ label: "CABI datasheet", url: "https://www.cabi.org/isc/datasheet/22097" }],
-  },
-  RUST: {
-    title: "RUST",
-    short:
-      "Peanut rust disebabkan jamur (Puccinia arachidis) dengan gejala pustula berwarna cokelat-oranye (karat) terutama di permukaan bawah daun. Infeksi berat dapat menyebabkan daun menguning dan rontok.",
-    sources: [{ label: "UF/IFAS EDIS", url: "https://edis.ifas.ufl.edu/publication/PP288" }],
-  },
+// ✅ Deskripsi penyakit ringkas (SAMA seperti di HistoryDetailPage.jsx)
+// Catatan: Ini ringkasan gejala umum untuk membantu interpretasi hasil model.
+const DISEASE_DESC = {
+  "ALTERNARIA LEAF SPOT":
+    "Umumnya muncul bercak cokelat hingga kehitaman pada daun, sering membentuk pola cincin konsentris (seperti ‘target spot’). Pada serangan berat dapat mempercepat penuaan/kerontokan daun.",
+  "LEAF SPOT (EARLY AND LATE)":
+    "Bercak daun (early/late leaf spot) ditandai bercak bulat gelap pada permukaan daun; pada sebagian kasus ada halo kekuningan. Dapat menyebabkan defoliasi sehingga menurunkan luas daun sehat.",
+  ROSETTE:
+    "Rosette ditandai tanaman kerdil, ruas memendek, daun berkelompok (rosette), sering disertai klorosis/mosaik. Biasanya berdampak besar pada pertumbuhan dan hasil.",
+  RUST:
+    "Karat daun ditandai pustula/benjolan oranye-kecokelatan (sering di permukaan bawah daun). Dapat menyebabkan daun mengering/nekrosis dan menurunkan vigor tanaman.",
+  HEALTHY:
+    "Daun tampak sehat tanpa gejala bercak, pustula karat, mosaik/klorosis berat, atau deformasi khas penyakit.",
 };
 
 const SHOW_DEBUG_PROBS = false;
@@ -103,15 +80,16 @@ const ClassifyPage = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
-  const [toast, setToast] = useState({open: false, type: "info", message: ""});
+  const [toast, setToast] = useState({ open: false, type: "info", message: "" });
 
   const [classifyBusy, setClassifyBusy] = useState(false);
 
-  // Deskripsi penyakit ditampilkan ke user
-  const diseaseInfo = useMemo(() => {
-    const key = _normLabelForInfo(result?.label);
-    return DISEASE_INFO[key] || null;
-  }, [result?.label]);
+  // ✅ Deskripsi penyakit (SAMA pola dengan HistoryDetailPage.jsx)
+  const labelNorm = useMemo(() => _normLabelForInfo(result?.label), [result?.label]);
+  const labelDesc = useMemo(
+    () => (labelNorm ? DISEASE_DESC[labelNorm] || "Deskripsi untuk label ini belum tersedia." : ""),
+    [labelNorm]
+  );
 
   const stopCamera = () => {
     try {
@@ -179,7 +157,7 @@ const ClassifyPage = () => {
       setCameraPanelOpen(true);
     } catch (e) {
       setCameraErr(e?.message || "Gagal membuka kamera.");
-      setToast({open: true, type: "error", message: e?.message || "Gagal membuka kamera."});
+      setToast({ open: true, type: "error", message: e?.message || "Gagal membuka kamera." });
     } finally {
       setCameraBusy(false);
     }
@@ -342,13 +320,13 @@ const ClassifyPage = () => {
 
       navigate("/history", {
         state: {
-          toast: {type: "success", message: "Hasil analisis berhasil disimpan."}
+          toast: { type: "success", message: "Hasil analisis berhasil disimpan." },
         },
-      })
+      });
     } catch (e) {
       const msg = e?.message || "Gagal menyimpan hasil analisis.";
       setSaveStatus({ loading: false, msg: "", err: msg });
-      setToast({open: true, type: "error", message: msg});
+      setToast({ open: true, type: "error", message: msg });
     }
   };
 
@@ -624,33 +602,16 @@ const ClassifyPage = () => {
                       </span>
                     </div>
 
-                    {/* ===== Deskripsi penyakit ===== */}
-                    {diseaseInfo && (
+                    {/* ✅ Deskripsi penyakit (SAMA seperti HistoryDetailPage.jsx) */}
+                    {labelNorm && (
                       <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fff" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                          <div style={{ fontWeight: 900 }}>Deskripsi</div>
-                          <span style={pill("neutral")}>{diseaseInfo.title}</span>
+                        <div style={{ fontWeight: 900, marginBottom: 8 }}>Deskripsi Penyakit</div>
+                        <div style={{ fontSize: 14, color: "#111827", lineHeight: 1.6 }}>
+                          {labelDesc}
                         </div>
-
-                        <p style={{ margin: "10px 0 0 0", lineHeight: 1.55, color: "#111827" }}>
-                          {diseaseInfo.short}
-                        </p>
-
-                        {!!(diseaseInfo.sources || []).filter((s) => s?.url).length && (
-                          <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>
-                            Sumber:&nbsp;
-                            {(diseaseInfo.sources || [])
-                              .filter((s) => s?.url)
-                              .map((s, idx, arr) => (
-                                <span key={s.url}>
-                                  <a href={s.url} target="_blank" rel="noreferrer">
-                                    {s.label || `Referensi ${idx + 1}`}
-                                  </a>
-                                  {idx < arr.length - 1 ? ", " : ""}
-                                </span>
-                              ))}
-                          </div>
-                        )}
+                        <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280" }}>
+                          Catatan: deskripsi ini adalah ringkasan gejala umum untuk membantu interpretasi hasil model.
+                        </div>
                       </div>
                     )}
 
@@ -720,6 +681,6 @@ const ClassifyPage = () => {
       `}</style>
     </div>
   );
-}
+};
 
 export default ClassifyPage;

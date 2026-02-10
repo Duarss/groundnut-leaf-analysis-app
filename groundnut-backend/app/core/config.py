@@ -98,9 +98,7 @@ class Config:
     # Threshold binarisasi leaf mask (kamu minta 0.5)
     SEV_LEAF_MASK_THRESHOLD = float(os.environ.get("SEV_LEAF_MASK_THRESHOLD", 0.5))
 
-    # Bins level FAO (5 level) dalam persen: 0-5-20-40-60-100
-    # (boleh override via env, format: "0,5,20,40,60,100")
-    SEV_FAO_BINS = os.environ.get("SEV_FAO_BINS", "0,5,20,40,60,100")
+    # SEV_SAD_BINS = os.environ.get("SEV_SAD_BINS", "0,3,6,12,25,50,75,87,94,97,99,100")
 
     # =========================
     # DATABASE (MySQL only)

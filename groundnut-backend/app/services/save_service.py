@@ -65,14 +65,20 @@ def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | No
     if seg_enabled and overlay_tmp_path:
         overlay_saved_path = persist_file(overlay_tmp_path, client_id, analysis_id, "overlay.png")
 
-    # severity info
-    sev = seg.get("severity") or {}
+    # severity SAD
+    sev = (seg.get("severity") or {}) if seg_enabled else {}
     severity_pct = sev.get("severity_pct", None)
 
-    severity_level = None
-    fao = sev.get("fao") or {}
-    if isinstance(fao, dict) and "level" in fao:
-        severity_level = fao.get("level")
+    sad = sev.get("sad") or {}
+    sad_scheme = sad.get("scheme")
+    sad_class_index = sad.get("class_index")
+    sad_midpoint_pct = sad.get("midpoint_pct")
+    sad_range = sad.get("range_pct")  # [low, high]
+    sad_range_low = None
+    sad_range_high = None
+    if isinstance(sad_range, (list, tuple)) and len(sad_range) == 2:
+        sad_range_low = sad_range[0]
+        sad_range_high = sad_range[1]
 
     db = SessionLocal()
     try:
@@ -91,13 +97,21 @@ def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | No
             seg_enabled=bool(seg_enabled),
 
             severity_pct=float(severity_pct) if severity_pct is not None else None,
-            severity_fao_level=int(severity_level) if severity_level is not None else None,
+            
+            # SAD fields
+            sad_scheme=str(sad_scheme) if sad_scheme else None,
+            sad_class_index=int(sad_class_index) if sad_class_index is not None else None,
+            sad_midpoint_pct=float(sad_midpoint_pct) if sad_midpoint_pct is not None else None,
+            sad_range_low=float(sad_range_low) if sad_range_low is not None else None,
+            sad_range_high=float(sad_range_high) if sad_range_high is not None else None,
         )
         db.add(row)
         db.commit()
+
     except SQLAlchemyError as e:
         db.rollback()
         raise RuntimeError(f"DB error: {e}") from e
+    
     finally:
         db.close()
 
@@ -115,5 +129,10 @@ def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | No
         "seg_enabled": seg_enabled,
         "seg_overlay_path": overlay_saved_path,
         "severity_pct": severity_pct,
-        "severity_fao_level": severity_level,
+        "sad": {
+            "scheme": sad_scheme,
+            "class_index": sad_class_index,
+            "midpoint_pct": sad_midpoint_pct,
+            "range_pct": sad_range,
+        } if sad else None,
     }

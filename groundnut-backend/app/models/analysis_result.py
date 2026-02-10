@@ -29,4 +29,10 @@ class AnalysisResult(Base):
 
     # severity (optional, hanya kalau segmentasi jalan)
     severity_pct = Column(Float, nullable=True)
-    severity_fao_level = Column(Integer, nullable=True)
+    
+    # SAD (Horsfall–Barratt) fields (ordinal-scale)
+    sad_scheme = Column(String(128), nullable=True)
+    sad_class_index = Column(Integer, nullable=True)
+    sad_midpoint_pct = Column(Float, nullable=True)
+    sad_range_low = Column(Float, nullable=True)
+    sad_range_high = Column(Float, nullable=True)

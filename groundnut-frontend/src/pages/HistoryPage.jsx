@@ -9,69 +9,73 @@ import { fetchHistoryList, deleteHistoryItem } from "../api/historyApi";
 import { formatJakartaTime } from "../utils/dateTime";
 import { useIsMobile } from "../utils/useIsMobile";
 
-// Label keparahan (bahasa formal)
-const FAO_SEVERITY_LABEL = {
-  1: "Sangat Ringan",
-  2: "Ringan",
-  3: "Sedang",
-  4: "Berat",
-  5: "Sangat Berat",
-};
+// function fmtConfPct(x) {
+//   if (x === null || x === undefined) return "-";
+//   const n = Number(x);
+//   if (Number.isNaN(n)) return "-";
+//   return `${(n * 100).toFixed(2)}%`;
+// }
 
-function fmtConfPct(x) {
-  if (x === null || x === undefined) return "-";
-  const n = Number(x);
-  if (Number.isNaN(n)) return "-";
-  return `${(n * 100).toFixed(2)}%`;
+function numOrNull(v) {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
-function inferSeverityLevelFromPct(severity_pct) {
-  const pct = Number(severity_pct);
-  if (!Number.isFinite(pct)) return null;
-  if (pct <= 10) return 1;
-  if (pct <= 20) return 2;
-  if (pct <= 40) return 3;
-  if (pct <= 60) return 4;
-  return 5;
+// ===== SAD helpers =====
+// item bisa punya: severity_sad_class_index / sad_class_index / sad?.class_index
+function getSadClassIndex(it) {
+  const a =
+    it?.severity_sad_class_index ??
+    it?.sad_class_index ??
+    it?.sad_class ??
+    it?.sad?.class_index ??
+    it?.severity?.sad?.class_index ??
+    null;
+
+  const n = numOrNull(a);
+  if (n == null) return null;
+
+  // HB classes umumnya 0..11
+  const idx = Math.round(n);
+  if (idx < 0 || idx > 11) return idx; // tetap tampilkan, walau out of range
+  return idx;
 }
 
-function getSeverityLevel(it) {
-  const lvl = Number(it?.severity_fao_level);
-  if (Number.isFinite(lvl) && lvl >= 1 && lvl <= 5) return lvl;
-  return inferSeverityLevelFromPct(it?.severity_pct);
-}
+// function fmtSeverityPct(it) {
+//   const p = numOrNull(it?.severity_pct);
+//   if (p == null) return "-";
+//   return `${p.toFixed(2)}%`;
+// }
 
-function getSeverityLabel(it) {
-  if (it?.seg_enabled === false) return "-";
-  const lvl = getSeverityLevel(it);
-  if (!lvl) return "-";
-  return FAO_SEVERITY_LABEL[lvl] || "-";
-}
-
-function severityBadgeStyle(level) {
-  if (!level) {
-    return { background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb" };
-  }
-  const map = {
-    1: { background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" },
-    2: { background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" },
-    3: { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" },
-    4: { background: "#fff7ed", color: "#9a3412", border: "1px solid #fdba74" },
-    5: { background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" },
-  };
-  return map[level] || map[3];
+function severityBadgeStyleByPct(pct) {
+  if (pct == null) return { background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb" };
+  // sederhana: makin tinggi makin "merah"
+  if (pct >= 60) return { background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" };
+  if (pct >= 20) return { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" };
+  return { background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" };
 }
 
 function SeverityBadge({ item }) {
-  const label = getSeverityLabel(item);
-  if (label === "-") return <span style={{ color: "#6b7280" }}>-</span>;
+  if (item?.seg_enabled === false) return <span style={{ color: "#6b7280" }}>-</span>;
 
-  const lvl = getSeverityLevel(item);
-  const st = severityBadgeStyle(lvl);
+  const cls = getSadClassIndex(item);
+  const pct = numOrNull(item?.severity_pct);
+
+  if (cls == null && pct == null) return <span style={{ color: "#6b7280" }}>-</span>;
+
+  const st = severityBadgeStyleByPct(pct);
+
+  const label =
+    cls != null ? `SAD C${cls}` : "SAD";
+
+  const titleParts = [];
+  if (pct != null) titleParts.push(`Keparahan: ${pct.toFixed(2)}%`);
+  if (cls != null) titleParts.push(`SAD class: ${cls}`);
+  const title = titleParts.length ? titleParts.join(" • ") : "SAD";
 
   return (
     <span
-      title="Kategori keparahan (acuan FAO)"
+      title={title}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -79,13 +83,14 @@ function SeverityBadge({ item }) {
         padding: "4px 10px",
         borderRadius: 999,
         fontSize: 13,
-        fontWeight: 700,
+        fontWeight: 800,
         lineHeight: 1.2,
         ...st,
       }}
     >
       <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: st.color }} />
       {label}
+      {pct != null ? <span style={{ fontWeight: 900 }}>• {pct.toFixed(1)}%</span> : null}
     </span>
   );
 }
@@ -139,7 +144,6 @@ const HistoryPage = () => {
           (Array.isArray(data) && data) ||
           [];
 
-        // Total bisa bervariasi tergantung bentuk response API
         const totalFromApi =
           (Number.isFinite(Number(data?.total)) && Number(data.total)) ||
           (Number.isFinite(Number(data?.data?.total)) && Number(data.data.total)) ||
@@ -151,7 +155,6 @@ const HistoryPage = () => {
           setItems(list);
           setTotal(totalFromApi);
 
-          // Jika total tidak tersedia, anggap masih ada halaman berikutnya bila list = pageSize
           if (totalFromApi !== null) {
             setHasNext(offset + list.length < totalFromApi);
           } else {
@@ -196,7 +199,6 @@ const HistoryPage = () => {
     setPage(1);
   }
 
-  // ===== Modal control =====
   function openDeleteModal(it) {
     if (!it?.analysis_id) return;
     setSelectedItem(it);
@@ -204,7 +206,6 @@ const HistoryPage = () => {
   }
 
   function closeDeleteModal() {
-    // saat sedang delete, jangan bisa close (biar state aman)
     if (deletingId) return;
     setConfirmOpen(false);
     setSelectedItem(null);
@@ -224,7 +225,6 @@ const HistoryPage = () => {
       setConfirmOpen(false);
       setSelectedItem(null);
 
-      // kalau page jadi kosong & page > 1, mundurkan page biar user gak lihat halaman kosong
       setTimeout(() => {
         setItems((curr) => {
           if (curr.length === 0 && page > 1) {
@@ -242,7 +242,12 @@ const HistoryPage = () => {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-      <Toast open={toast.open} type={toast.type} message={toast.message} onClose={() => setToast((v) => ({ ...v, open: false }))} />
+      <Toast
+        open={toast.open}
+        type={toast.type}
+        message={toast.message}
+        onClose={() => setToast((v) => ({ ...v, open: false }))}
+      />
 
       <ConfirmModal
         open={confirmOpen}
@@ -269,7 +274,6 @@ const HistoryPage = () => {
 
         {!loading && hasItems && (
           <>
-            {/* Toolbar: page size + pagination */}
             <div
               style={{
                 display: "flex",
@@ -280,7 +284,6 @@ const HistoryPage = () => {
                 marginBottom: 12,
               }}
             >
-              {/* Kiri: page size */}
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 13, color: "#374151", fontWeight: 700 }}>Tampilkan</span>
                 <select value={pageSize} onChange={onChangePageSize} style={select} aria-label="Jumlah data per halaman">
@@ -293,7 +296,6 @@ const HistoryPage = () => {
                 <span style={{ fontSize: 13, color: "#6b7280" }}>data / halaman</span>
               </div>
 
-              {/* Kanan: pagination */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, color: "#6b7280" }}>
                   Halaman <b style={{ color: "#111827" }}>{page}</b>
@@ -329,7 +331,6 @@ const HistoryPage = () => {
               </div>
             </div>
 
-            {/* Mobile: list cards */}
             {isMobile ? (
               <div style={{ display: "grid", gap: 12 }}>
                 {items.map((it) => (
@@ -342,14 +343,13 @@ const HistoryPage = () => {
                       background: "#fff",
                     }}
                   >
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>{formatJakartaTime(it.created_at)} (WIB)</div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>
+                      {formatJakartaTime(it.created_at)} (WIB)
+                    </div>
 
                     <div style={{ fontSize: 16, fontWeight: 900, marginTop: 4 }}>{it.label ?? "-"}</div>
 
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                      <span style={{ fontSize: 13, color: "#111827" }}>
-                        Keyakinan: <b>{fmtConfPct(it.confidence)}</b>
-                      </span>
                       <SeverityBadge item={it} />
                     </div>
 
@@ -370,15 +370,13 @@ const HistoryPage = () => {
                 ))}
               </div>
             ) : (
-              /* Desktop: table */
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
                       <th style={th}>Waktu (WIB)</th>
                       <th style={th}>Label</th>
-                      <th style={th}>Confidence</th>
-                      <th style={th}>Keparahan</th>
+                      <th style={th}>Estimasi Keparahan</th>
                       <th style={th}>Aksi</th>
                     </tr>
                   </thead>
@@ -387,9 +385,10 @@ const HistoryPage = () => {
                       <tr key={it.analysis_id}>
                         <td style={td}>{formatJakartaTime(it.created_at)}</td>
                         <td style={td}>{it.label ?? "-"}</td>
-                        <td style={td}>{fmtConfPct(it.confidence)}</td>
                         <td style={td}>
-                          <SeverityBadge item={it} />
+                          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                            <SeverityBadge item={it} />
+                          </div>
                         </td>
                         <td style={td}>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

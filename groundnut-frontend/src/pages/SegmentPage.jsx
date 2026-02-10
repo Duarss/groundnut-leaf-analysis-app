@@ -3,11 +3,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
-import { segmentImage, saveAnalysis } from "../api/analysisApi";
-import { useIsMobile } from "../utils/useIsMobile";
 import ImageBox from "../components/ui/ImageBox";
 import Toast from "../components/ui/Toast";
+import { segmentImage, saveAnalysis } from "../api/analysisApi";
+import { useIsMobile } from "../utils/useIsMobile";
 
+// sessionStorage keys
 const _key = (analysisId) => `analysis_session_${analysisId}`;
 
 function _safeParse(jsonStr) {
@@ -17,6 +18,11 @@ function _safeParse(jsonStr) {
     void e;
     return null;
   }
+}
+
+function _numOrNull(v) {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 const SegmentPage = () => {
@@ -32,15 +38,18 @@ const SegmentPage = () => {
   const [overlaySrc, setOverlaySrc] = useState("");
   const [maskSrc, setMaskSrc] = useState("");
 
+  // ===== SAD (HB) states =====
   const [severityPct, setSeverityPct] = useState(null);
-  const [faoLevel, setFaoLevel] = useState(null);
-  const [faoRange, setFaoRange] = useState(null);
+  const [sadScheme, setSadScheme] = useState("");
+  const [sadClassIndex, setSadClassIndex] = useState(null);
+  const [sadRange, setSadRange] = useState(null);
+  const [sadMidpoint, setSadMidpoint] = useState(null);
 
   const [leafMaskSrc, setLeafMaskSrc] = useState("");
   const [showLeafMask, setShowLeafMask] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
-  const [toast, setToast] = useState({open: false, type: "info", message: ""});
+  const [toast, setToast] = useState({ open: false, type: "info", message: "" });
 
   const cached = useMemo(() => {
     if (!analysisId) return null;
@@ -51,6 +60,29 @@ const SegmentPage = () => {
   const diseaseLabel = cached?.label || cached?.result?.label || "";
   const confidence = cached?.confidence ?? cached?.result?.confidence;
 
+  // ===== UI helper (SAMA seperti ClassifyPage.jsx) =====
+  const pill = (tone = "neutral") => {
+    const map = {
+      neutral: { bg: "#f3f4f6", fg: "#374151", bd: "#e5e7eb" },
+      good: { bg: "#ecfdf5", fg: "#065f46", bd: "#a7f3d0" },
+      warn: { bg: "#fffbeb", fg: "#92400e", bd: "#fde68a" },
+      dark: { bg: "#111827", fg: "#ffffff", bd: "#111827" },
+    };
+    const t = map[tone] || map.neutral;
+    return {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "6px 10px",
+      borderRadius: 999,
+      border: `1px solid ${t.bd}`,
+      background: t.bg,
+      color: t.fg,
+      fontWeight: 800,
+      fontSize: 12,
+      whiteSpace: "nowrap",
+    };
+  };
+
   useEffect(() => {
     if (!analysisId) return;
 
@@ -59,24 +91,19 @@ const SegmentPage = () => {
 
     async function loadOriginal() {
       try {
-        // reset dulu
         setOriginalSrc("");
 
         const res = await fetch(`/api/temp-image/${encodeURIComponent(analysisId)}`, {
           method: "GET",
         });
 
-        if (!res.ok) {
-          // kalau tidak ada file temp (misal TTL habis), biarkan kosong
-          return;
-        }
+        if (!res.ok) return;
 
         const blob = await res.blob();
         objectUrl = URL.createObjectURL(blob);
         if (alive) setOriginalSrc(objectUrl);
       } catch (e) {
         void e;
-        // silent fail → fallback tetap kosong
       }
     }
 
@@ -92,13 +119,17 @@ const SegmentPage = () => {
     setError("");
     setOverlaySrc("");
     setMaskSrc("");
+
     setSeverityPct(null);
-    setFaoLevel(null);
-    setFaoRange(null);
+    setSadScheme("");
+    setSadClassIndex(null);
+    setSadRange(null);
+    setSadMidpoint(null);
+
     setLeafMaskSrc("");
     setShowLeafMask(false);
     setSaveStatus({ loading: false, msg: "", err: "" });
-    setToast({open: false, type: "info", message: ""});
+    setToast({ open: false, type: "info", message: "" });
   }, [analysisId]);
 
   const handleRunSegmentation = async () => {
@@ -127,16 +158,27 @@ const SegmentPage = () => {
 
       const sev = data?.severity || null;
       if (sev) {
-        const pct = sev?.severity_pct;
-        setSeverityPct(typeof pct === "number" ? pct : pct != null ? Number(pct) : null);
+        // severity pct
+        const pct = _numOrNull(sev?.severity_pct);
+        setSeverityPct(pct);
 
-        const lvl = sev?.fao?.level;
-        setFaoLevel(typeof lvl === "number" ? lvl : lvl != null ? Number(lvl) : null);
+        // SAD (HB)
+        const sad = sev?.sad || sev?.SAD || null;
 
-        const rng = sev?.fao?.range_pct;
-        if (Array.isArray(rng) && rng.length === 2) setFaoRange([Number(rng[0]), Number(rng[1])]);
-        else setFaoRange(null);
+        const scheme = (sad?.scheme || "").toString();
+        setSadScheme(scheme);
 
+        const ci = _numOrNull(sad?.class_index ?? sad?.class ?? sad?.classId);
+        setSadClassIndex(ci);
+
+        const rng = sad?.range_pct;
+        if (Array.isArray(rng) && rng.length === 2) setSadRange([Number(rng[0]), Number(rng[1])]);
+        else setSadRange(null);
+
+        const mid = _numOrNull(sad?.midpoint_pct ?? sad?.midpoint);
+        setSadMidpoint(mid);
+
+        // leaf mask (opsional)
         const leafMaskB64 = sev?.leaf_mask_png_base64;
         if (leafMaskB64) setLeafMaskSrc(`data:image/png;base64,${leafMaskB64}`);
         else {
@@ -145,8 +187,11 @@ const SegmentPage = () => {
         }
       } else {
         setSeverityPct(null);
-        setFaoLevel(null);
-        setFaoRange(null);
+        setSadScheme("");
+        setSadClassIndex(null);
+        setSadRange(null);
+        setSadMidpoint(null);
+
         setLeafMaskSrc("");
         setShowLeafMask(false);
       }
@@ -167,7 +212,6 @@ const SegmentPage = () => {
       if (!res?.saved) throw new Error(res?.error || "Gagal menyimpan hasil analisis.");
       setSaveStatus({ loading: false, msg: "", err: "" });
 
-      // pindah ke history + toast sukses ditampilkan di HistoryPage
       navigate("/history", {
         state: {
           toast: { type: "success", message: "Hasil analisis berhasil disimpan." },
@@ -176,21 +220,23 @@ const SegmentPage = () => {
     } catch (e) {
       const msg = e?.message || "Gagal menyimpan hasil analisis.";
       setSaveStatus({ loading: false, msg: "", err: msg });
-      setToast({open: true, type: "error", message: msg});
+      setToast({ open: true, type: "error", message: msg });
     }
   };
 
-  const severityText = (() => {
+  const severityText = useMemo(() => {
     if (severityPct == null || Number.isNaN(severityPct)) return "-";
     return `${severityPct.toFixed(2)}%`;
-  })();
+  }, [severityPct]);
 
-  const faoText = (() => {
-    if (faoLevel == null || Number.isNaN(faoLevel)) return "-";
-    if (Array.isArray(faoRange) && faoRange.length === 2)
-      return `Level ${faoLevel} (rentang ${faoRange[0]}–${faoRange[1]}%)`;
-    return `Level ${faoLevel}`;
-  })();
+  const sadText = useMemo(() => {
+    if (sadClassIndex == null || Number.isNaN(sadClassIndex)) return "-";
+    const cls = `Kelas SAD ${Math.round(sadClassIndex)}`;
+    const range =
+      Array.isArray(sadRange) && sadRange.length === 2 ? ` (rentang ${sadRange[0]}–${sadRange[1]}%)` : "";
+    const mid = sadMidpoint != null ? ` • midpoint ${sadMidpoint.toFixed(1)}%` : "";
+    return `${cls}${range}${mid}`;
+  }, [sadClassIndex, sadRange, sadMidpoint]);
 
   const canShowSave = Boolean(overlaySrc);
 
@@ -202,6 +248,7 @@ const SegmentPage = () => {
         message={toast.message}
         onClose={() => setToast((v) => ({ ...v, open: false }))}
       />
+
       <h2>Hasil Segmentasi Area Terinfeksi</h2>
       <p className="page-description">
         Halaman ini menampilkan overlay (citra asli + hasil prediksi mask) dari tahap segmentasi.
@@ -214,15 +261,18 @@ const SegmentPage = () => {
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <Card title="Estimasi Keparahan Penyakit" subtitle="Persentase keparahan + level berdasarkan standar FAO">
+        <Card
+          title="Estimasi Keparahan Penyakit"
+          subtitle={sadScheme ? `Persentase keparahan + pemetaan SAD (${sadScheme})` : "Persentase keparahan + pemetaan SAD"}
+        >
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontSize: 13, opacity: 0.8 }}>Keparahan</div>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{severityText}</div>
             </div>
             <div>
-              <div style={{ fontSize: 13, opacity: 0.8 }}>Level FAO</div>
-              <div style={{ fontSize: 18, fontWeight: 600 }}>{faoText}</div>
+              <div style={{ fontSize: 13, opacity: 0.8 }}>SAD</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{sadText}</div>
             </div>
           </div>
 
@@ -257,13 +307,13 @@ const SegmentPage = () => {
           gap: 16,
         }}
       >
-        <Card title="Citra Asli">
+        <Card title="Gambar Asli">
           {!originalSrc ? (
-            <p className="placeholder">Citra asli tidak tersedia (mungkin sudah kadaluarsa / belum ada di tmp_uploads).</p>
+            <p className="placeholder">Gambar asli tidak tersedia (mungkin sudah kadaluarsa / belum ada di tmp_uploads).</p>
           ) : (
             <ImageBox
               src={originalSrc}
-              alt="Citra asli"
+              alt="Gambar asli"
               isMobile={isMobile}
               maxHeightMobile={240}
               maxHeightDesktop={420}
@@ -272,17 +322,41 @@ const SegmentPage = () => {
           )}
         </Card>
 
-        <Card title="Overlay Segmentasi" subtitle="Citra asli + mask prediksi">
+        <Card title="Visualisasi Area Terinfeksi" subtitle="Gambar asli + prediksi area terinfeksi">
           {!overlaySrc && !isLoading && (
             <p className="placeholder">
               Klik tombol <b>Proses Segmentasi</b> untuk menghasilkan overlay.
             </p>
           )}
-          {isLoading && <p className="placeholder">Sedang memproses...</p>}
+
+          {/* ✅ Loading anim: SAMA seperti ClassifyPage.jsx */}
+          {!overlaySrc && isLoading && (
+            <div style={{ padding: 12, border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ fontWeight: 900 }}>Sedang memproses...</div>
+                <span style={pill("dark")}>Running</span>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 13, color: "#6b7280", lineHeight: 1.5 }}>
+                Mohon tunggu, sistem sedang melakukan inferensi model segmentasi.
+              </div>
+              <div style={{ marginTop: 10, height: 10, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: "60%",
+                    height: "100%",
+                    background: "#111827",
+                    borderRadius: 999,
+                    animation: "pulse 1.2s ease-in-out infinite",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {overlaySrc && (
             <ImageBox
               src={overlaySrc}
-              alt="Overlay segmentasi"
+              alt="Visualisasi area terinfeksi"
               isMobile={isMobile}
               maxHeightMobile={240}
               maxHeightDesktop={420}
@@ -336,6 +410,15 @@ const SegmentPage = () => {
           Kembali
         </Button>
       </div>
+
+      {/* ✅ anim keyframes (inline) - sama seperti ClassifyPage */}
+      <style>{`
+        @keyframes pulse {
+          0% { transform: translateX(-20%); opacity: .65; }
+          50% { transform: translateX(10%); opacity: 1; }
+          100% { transform: translateX(-20%); opacity: .65; }
+        }
+      `}</style>
     </div>
   );
 };
