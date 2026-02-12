@@ -15,10 +15,10 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 5173,
       strictPort: true,
-      // Paling pasti untuk ngrok (DEMO/dev)
+      // (DEMO/dev)
       allowedHosts: true,
 
-      // Ngrok pakai https -> HMR perlu wss + port 443
+      // https -> HMR perlu wss + port 443
       hmr: {
         protocol: "wss",
         clientPort: 443,

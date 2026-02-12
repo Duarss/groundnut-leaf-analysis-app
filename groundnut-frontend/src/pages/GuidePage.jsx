@@ -174,7 +174,7 @@ const GuidePage = () => {
               Visualisasi area yang diprediksi terinfeksi pada daun (overlay).
             </li>
             <li>
-              <b>Estimasi Keparahan</b>
+              <b>Estimasi Tingkat Keparahan</b>
               <br />
               Ditampilkan sebagai <b>persentase</b> (area terinfeksi dibanding area daun) dan <b>kelas SAD</b>{" "}
               untuk membantu interpretasi tingkat keparahan secara visual.
