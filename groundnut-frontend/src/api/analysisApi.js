@@ -1,6 +1,18 @@
 // src/api/analysisApi.js
 import { getClientId } from "../utils/clientId";
 
+// Header untuk bypass halaman warning ngrok (free domain)
+const NGROK_SKIP_HEADER = { "ngrok-skip-browser-warning": "true" };
+
+// Helper fetch dengan default header ngrok-skip
+async function _fetch(url, opts = {}) {
+  const headers = {
+    ...NGROK_SKIP_HEADER,
+    ...(opts.headers || {}),
+  };
+  return fetch(url, { ...opts, headers });
+}
+
 async function _parseError(res, fallbackMsg) {
   let msg = fallbackMsg;
   try {
@@ -16,14 +28,11 @@ async function _parseError(res, fallbackMsg) {
 // ================================
 // CLASSIFICATION
 // ================================
-// Expected backend response (tolerant):
-//  - { analysis_id, label, confidence, probs }
-//  - or { id, label, confidence, probs }
 export async function classifyImage(file) {
   const formData = new FormData();
   formData.append("image", file);
 
-  const res = await fetch(`/api/classify`, {
+  const res = await _fetch(`/api/classify`, {
     method: "POST",
     body: formData,
   });
@@ -48,10 +57,8 @@ export async function classifyImage(file) {
 // ================================
 // SEGMENTATION & SEVERITY ESTIMATION
 // ================================
-// Expected backend response (tolerant):
-//  - { analysis_id, overlay_png_base64, mask_png_base64?, meta? }
 export async function segmentImage(analysisId) {
-  const res = await fetch(`/api/segment`, {
+  const res = await _fetch(`/api/segment`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ analysis_id: analysisId }),
@@ -67,10 +74,8 @@ export async function segmentImage(analysisId) {
 // ================================
 // SAVE ANALYSIS
 // ================================
-// Expected backend response:
-//  - { saved: true, analysis_id, client_id, orig_image_path, seg_enabled, seg_overlay_path }
 export async function saveAnalysis(analysisId, body = {}) {
-  const res = await fetch(`/api/save`, {
+  const res = await _fetch(`/api/save`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
