@@ -63,6 +63,9 @@ def _decoder_block(x, skip, f, drop, idx=0):
     x = _conv(x, f, k=3, use_bn=False, drop=0.0)
     return x
 
+def load_selected_cfg():
+    with open(Config.BEST_SEG_TUNED_CFG_PATH, encoding="utf-8") as f:
+        return json.load(f)
 
 def build_unet_efficientnetb0(net_h, net_w, out_channels=4, train_encoder=False):
     inp = Input((net_h, net_w, 3))
@@ -94,16 +97,7 @@ def build_unet_efficientnetb0(net_h, net_w, out_channels=4, train_encoder=False)
     model = Model(inp, out, name="UNet_EfficientNetB0")
     return model, base
 
-
-def load_selected_cfg():
-    with open(Config.BEST_SEG_TUNED_CFG_PATH, encoding="utf-8") as f:
-        return json.load(f)
-
-
 def get_segmentation_model():
-    """
-    Load 1x model global4 dan cache di memory.
-    """
     global _model
     if _model is not None:
         return _model

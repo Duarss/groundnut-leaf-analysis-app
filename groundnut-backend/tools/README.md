@@ -2,7 +2,8 @@
 
 Semua script di folder ini diasumsikan dijalankan dari folder `groundnut-backend/` (working directory).
 Default path:
-- Raw dataset: `datasets/raw/cleaned_ori_dataset`
+- Raw original dataset: `datasets/raw/ori_dataset`
+- Raw cleaned dataset: `datasets/raw/cleaned_ori_dataset`
 - Output split: `datasets/processed/<task>_dataset`
 - Orphans report: `datasets/results/orphans_report`
 

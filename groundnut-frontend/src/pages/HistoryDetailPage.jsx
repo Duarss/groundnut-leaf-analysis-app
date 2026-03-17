@@ -9,6 +9,28 @@ import { getClientId } from "../utils/clientId";
 import { formatJakartaTime } from "../utils/dateTime";
 import { useIsMobile } from "../utils/useIsMobile";
 
+const LABEL_ID = {
+  "ALTERNARIA LEAF SPOT": "Bercak Daun Alternaria",
+  "LEAF SPOT (EARLY AND LATE)": "Bercak Daun Tahap Awal & Akhir",
+  ROSETTE: "Roset",
+  RUST: "Karat Daun",
+  HEALTHY: "Sehat",
+};
+
+function normLabel(label) {
+  const key = String(label || "").trim().toUpperCase();
+  if (!key) return "";
+  if (key === "LEAF SPOT" || key === "LEAFSPOT") return "LEAF SPOT (EARLY AND LATE)";
+  return key;
+}
+
+function labelBilingual(label) {
+  const k = normLabel(label);
+  if (!k) return "-";
+  const id = LABEL_ID[k];
+  return id ? `${k} (${id})` : k;
+}
+
 function prettyLabel(s) {
   if (!s) return "-";
   return String(s).trim().replace(/\s+/g, " ");
@@ -51,7 +73,6 @@ function numOrNull(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Catatan: Ini ringkasan gejala umum dari sumber tepercaya (lihat catatan sitasi di chat).
 const LABEL_DESC = {
   "ALTERNARIA LEAF SPOT":
     "Umumnya muncul bercak cokelat hingga kehitaman pada daun, sering membentuk pola cincin konsentris (seperti ‘target spot’). Pada serangan berat dapat mempercepat penuaan/kerontokan daun.",
@@ -99,8 +120,7 @@ function Chip({ children, tone = "neutral", title }) {
 
 function ProbabilitiesChart({ probsList }) {
   const [showAll, setShowAll] = useState(false);
-  if (!probsList?.length)
-    return <div style={{ fontSize: 13, color: "#6b7280" }}>Tidak ada data probabilitas.</div>;
+  if (!probsList?.length) return <div style={{ fontSize: 13, color: "#6b7280" }}>Tidak ada data probabilitas.</div>;
 
   const shown = showAll ? probsList : probsList.slice(0, 5);
 
@@ -112,7 +132,7 @@ function ProbabilitiesChart({ probsList }) {
           <div key={`${item.label}-${idx}`} style={{ padding: 10, border: "1px solid #e5e7eb", borderRadius: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
               <div style={{ fontSize: 14, fontWeight: isTop ? 900 : 800 }}>
-                {item.label}{" "}
+                {labelBilingual(item.label)}{" "}
                 {isTop ? <span style={{ fontSize: 12, color: "#6b7280" }}>• Tertinggi</span> : null}
               </div>
               <div style={{ fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{item.pct.toFixed(2)}%</div>
@@ -172,8 +192,8 @@ const HistoryDetailPage = () => {
     };
   }, [analysisId]);
 
-  const labelNorm = useMemo(() => prettyLabel(data?.label).toUpperCase(), [data]);
-  const labelDesc = useMemo(() => LABEL_DESC[labelNorm] || "Deskripsi untuk label ini belum tersedia.", [labelNorm]);
+  const labelNorm = useMemo(() => normLabel(data?.label), [data]);
+  const labelDesc = useMemo(() => (labelNorm ? (LABEL_DESC[labelNorm] || "Deskripsi untuk label ini belum tersedia.") : "Deskripsi untuk label ini belum tersedia."), [labelNorm]);
 
   const probsObj = useMemo(() => parseProbsAny(data?.probs_json), [data]);
 
@@ -201,7 +221,6 @@ const HistoryDetailPage = () => {
   const confidenceText =
     typeof data?.confidence === "number" ? `${(data.confidence * 100).toFixed(2)}%` : "-";
 
-  // ===== SAD display =====
   const hasSeverity = useMemo(() => {
     const pct = data?.severity_pct;
     return data?.seg_enabled && pct !== null && pct !== undefined && Number.isFinite(Number(pct));
@@ -234,6 +253,11 @@ const HistoryDetailPage = () => {
     return n == null ? null : Math.round(n);
   }, [sadObj, data]);
 
+  const sadScheme = useMemo(() => {
+    const s = (sadObj?.scheme || "").toString().trim();
+    return s || "Horsfall–Barratt (12-class)";
+  }, [sadObj]);
+
   const sadRangeText = useMemo(() => {
     const rng = sadObj?.range_pct;
     if (Array.isArray(rng) && rng.length === 2) return `${Number(rng[0])}–${Number(rng[1])}%`;
@@ -244,11 +268,6 @@ const HistoryDetailPage = () => {
     const mid = numOrNull(sadObj?.midpoint_pct);
     if (mid == null) return "-";
     return `${mid.toFixed(1)}%`;
-  }, [sadObj]);
-
-  const sadScheme = useMemo(() => {
-    const s = (sadObj?.scheme || "").toString().trim();
-    return s || "Horsfall–Barratt (12-class)";
   }, [sadObj]);
 
   const severityChipTone = useMemo(() => {
@@ -281,10 +300,9 @@ const HistoryDetailPage = () => {
               </span>
             }
           >
-            <div style={{ fontSize: 20, fontWeight: 900 }}>{prettyLabel(data.label)}</div>
+            <div style={{ fontSize: 20, fontWeight: 900 }}>{labelBilingual(data.label)}</div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-              {/* <Chip tone="dark">Label: {prettyLabel(data.label)}</Chip> */}
               <Chip title="Keyakinan model">Keyakinan Prediksi: {confidenceText}</Chip>
               <Chip tone={data.seg_enabled ? "good" : "neutral"}>Segmentasi: {data.seg_enabled ? "Ya" : "Tidak"}</Chip>
 
@@ -301,11 +319,8 @@ const HistoryDetailPage = () => {
             </div>
           </Card>
 
-          {/* Deskripsi Label */}
           <Card title="Deskripsi Label">
-            <div style={{ fontSize: 14, color: "#111827", lineHeight: 1.6 }}>
-              {labelDesc}
-            </div>
+            <div style={{ fontSize: 14, color: "#111827", lineHeight: 1.6 }}>{labelDesc}</div>
             <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280" }}>
               Catatan: deskripsi ini adalah ringkasan gejala umum untuk membantu interpretasi hasil model.
             </div>

@@ -26,7 +26,6 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Hamburger button (visible on mobile) */}
         <button
           className="navbar-toggle"
           type="button"
@@ -38,7 +37,6 @@ const Navbar = () => {
           <span className="bar" />
         </button>
 
-        {/* Links */}
         <nav
           className={`navbar-links ${
             isMobileOpen ? "navbar-links-open" : ""

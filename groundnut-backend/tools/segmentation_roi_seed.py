@@ -72,7 +72,6 @@ def bbox_iou(a, b):
     return inter / float(area_a + area_b - inter + 1e-9)
 
 def connected_components(mask01):
-    """Tiny 4-neighborhood CC without scipy. Returns list of comps, each comp list[(y,x)]."""
     H, W = mask01.shape
     visited = np.zeros((H, W), dtype=np.uint8)
     comps = []
@@ -98,7 +97,6 @@ def connected_components(mask01):
     return comps
 
 def pick_seed_component(mask01, rng, min_comp_pixels=20):
-    """Pick random CC weighted by size; return centroid (x,y)."""
     comps = connected_components(mask01)
     comps = [c for c in comps if len(c) >= min_comp_pixels]
     if not comps:
@@ -114,7 +112,6 @@ def pick_seed_component(mask01, rng, min_comp_pixels=20):
     return cx, cy
 
 def resize_to_canvas(img_pil, msk_pil, canvas_h, canvas_w):
-    """ROI-from-resized: resize FIRST to canvas (W,H), then crop in that space."""
     img_rs = img_pil.resize((canvas_w, canvas_h), Image.BILINEAR)
     msk_rs = msk_pil.resize((canvas_w, canvas_h), Image.NEAREST)
     img_arr = np.asarray(img_rs, np.uint8)
@@ -128,11 +125,9 @@ def main():
     ap.add_argument("--train_split", default="train")
     ap.add_argument("--dest_train_split", default="train_roi")
 
-    # canvas must match how you resize during training/val (exe_segmentation_model.py)
     ap.add_argument("--canvas_h", type=int, default=480)
     ap.add_argument("--canvas_w", type=int, default=640)
 
-    # ROI output (square, for bbox workflow)
     ap.add_argument("--roi", type=int, default=384, help="Final ROI size (square). Default 384.")
 
     ap.add_argument("--n_rois_per_image", type=int, default=2,
@@ -200,7 +195,6 @@ def main():
             img = Image.open(ip).convert("RGB")
             msk = Image.open(mp).convert("L")
 
-            # IMPORTANT: resize first to canvas (matches your training pipeline base)
             img_arr, msk_arr = resize_to_canvas(img, msk, canvas_h, canvas_w)
 
             H, W = msk_arr.shape
@@ -239,7 +233,6 @@ def main():
 
                     ratio = float(msk_crop.sum()) / float(rw * rh)
                     if seed is None or ratio >= args.min_mask_ratio:
-                        # normalize to fixed roi x roi for saving
                         if (rh, rw) != (roi_h, roi_w):
                             img_p = Image.fromarray(img_crop).resize((roi_w, roi_h), Image.BILINEAR)
                             msk_p = Image.fromarray((msk_crop * 255).astype(np.uint8)).resize((roi_w, roi_h), Image.NEAREST)
@@ -265,8 +258,6 @@ def main():
               f"(from {len(use_pairs)} images x {args.n_rois_per_image}) | empty_seed={empty_seed}")
 
     print(f"\n[DONE] Saved train ROI to: {dst_root}")
-    print("[NOTE] Validation stays untouched: you will evaluate using original val split (full images).")
-    print("[TIP] For bbox workflow, keep ROI square (e.g., 384) and train model at the same square size.")
 
 if __name__ == "__main__":
     main()

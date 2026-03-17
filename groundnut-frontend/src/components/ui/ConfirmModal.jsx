@@ -2,16 +2,9 @@
 import React, { useEffect } from "react";
 
 export default function ConfirmModal({
-  open,
-  title = "Konfirmasi",
-  description = "Apakah kamu yakin?",
-  confirmText = "Ya, hapus",
-  cancelText = "Batal",
-  loading = false,
-  destructive = true,
-  onConfirm,
-  onClose,
-}) {
+  open, title = "Konfirmasi", description = "Apakah kamu yakin?",
+  confirmText = "Ya, hapus", cancelText = "Batal", loading = false,
+  destructive = true, onConfirm, onClose,}) {
   useEffect(() => {
     if (!open) return;
 
@@ -32,27 +25,17 @@ export default function ConfirmModal({
       role="dialog"
       aria-modal="true"
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9998,
-        background: "rgba(0,0,0,0.45)",
-        display: "grid",
-        placeItems: "center",
-        padding: 16,
+        position: "fixed", inset: 0, zIndex: 9998, background: "rgba(0,0,0,0.45)",
+        display: "grid", placeItems: "center", padding: 16,
       }}
       onMouseDown={(e) => {
-        // klik di backdrop untuk close
         if (e.target === e.currentTarget && !loading) onClose?.();
       }}
     >
       <div
         style={{
-          width: "100%",
-          maxWidth: 420,
-          background: "#fff",
-          borderRadius: 16,
-          boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
-          overflow: "hidden",
+          width: "100%", maxWidth: 420, background: "#fff", borderRadius: 16,
+          boxShadow: "0 20px 50px rgba(0,0,0,0.25)", overflow: "hidden",
         }}
       >
         <div style={{ padding: 16, borderBottom: "1px solid #e5e7eb" }}>
@@ -68,12 +51,8 @@ export default function ConfirmModal({
             disabled={loading}
             onClick={onClose}
             style={{
-              border: "1px solid #e5e7eb",
-              background: "#fff",
-              color: "#111827",
-              padding: "10px 12px",
-              borderRadius: 12,
-              cursor: loading ? "not-allowed" : "pointer",
+              border: "1px solid #e5e7eb", background: "#fff", color: "#111827",
+              padding: "10px 12px", borderRadius: 12, cursor: loading ? "not-allowed" : "pointer",
               fontWeight: 700,
             }}
           >
@@ -85,14 +64,9 @@ export default function ConfirmModal({
             disabled={loading}
             onClick={onConfirm}
             style={{
-              border: "none",
-              background: dangerBg,
-              color: "#fff",
-              padding: "10px 12px",
-              borderRadius: 12,
-              cursor: loading ? "not-allowed" : "pointer",
-              fontWeight: 800,
-              minWidth: 110,
+              border: "none", background: dangerBg, color: "#fff", padding: "10px 12px",
+              borderRadius: 12, cursor: loading ? "not-allowed" : "pointer",
+              fontWeight: 800, minWidth: 110,
             }}
           >
             {loading ? "Menghapus..." : confirmText}

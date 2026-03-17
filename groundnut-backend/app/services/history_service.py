@@ -7,10 +7,6 @@ from app.core.config import Config
 
 
 def _to_iso_utc(dt):
-    """
-    Pastikan output selalu ISO string.
-    Kalau datetime dari DB naive (tanpa tzinfo), anggap UTC.
-    """
     if dt is None:
         return None
     try:
@@ -22,10 +18,6 @@ def _to_iso_utc(dt):
         return str(dt)
 
 def _safe_abs_path(rel_or_abs: str) -> str | None:
-    """
-    Ubah path yang tersimpan di DB menjadi absolute path yang aman di storage.
-    DB kamu menyimpan path seperti "<client_id>/<analysis_id>/orig.jpg" (relatif).
-    """
     if not rel_or_abs:
         return None
 
@@ -53,23 +45,17 @@ def _try_remove_file(path: str | None):
         if os.path.exists(path) and os.path.isfile(path):
             os.remove(path)
     except Exception:
-        # jangan bikin delete gagal hanya karena file missing/locked
         pass
 
 
 def _try_cleanup_dirs(path: str | None):
-    """
-    Bersihkan folder kosong: .../<client_id>/<analysis_id>/ (kalau kosong)
-    """
     if not path:
         return
     try:
         d = os.path.dirname(path)
-        # hapus folder analysis_id jika kosong
         if os.path.isdir(d) and not os.listdir(d):
             os.rmdir(d)
 
-        # coba hapus folder client_id kalau kosong (opsional, aman)
         parent = os.path.dirname(d)
         if os.path.isdir(parent) and not os.listdir(parent):
             os.rmdir(parent)
@@ -99,7 +85,6 @@ def list_history(client_id: str, limit: int = 50, offset: int = 0):
                     "confidence": r.confidence,
                     "seg_enabled": r.seg_enabled,
                     "severity_pct": r.severity_pct,
-                    # SAD ringkas untuk HistoryPage
                     "sad_class_index": r.sad_class_index,
                     "sad_midpoint_pct": r.sad_midpoint_pct,
                 }
@@ -109,11 +94,7 @@ def list_history(client_id: str, limit: int = 50, offset: int = 0):
     finally:
         db.close()
 
-
 def get_history_detail(analysis_id: str, client_id: str) -> dict:
-    """
-    WAJIB: client_id dikirim dari route.
-    """
     if not client_id:
         raise ValueError("client_id wajib")
 
@@ -140,7 +121,6 @@ def get_history_detail(analysis_id: str, client_id: str) -> dict:
             "seg_overlay_path": row.seg_overlay_path,
             "severity_pct": row.severity_pct,
 
-            # SAD lengkap untuk detail
             "sad": {
                 "scheme": row.sad_scheme,
                 "class_index": row.sad_class_index,
@@ -154,12 +134,6 @@ def get_history_detail(analysis_id: str, client_id: str) -> dict:
         db.close()
 
 def delete_history_item(analysis_id: str, client_id: str, delete_files: bool = True) -> dict:
-    """
-    Hapus 1 item history:
-    - validasi client_id (multi-user tanpa login)
-    - hapus row DB
-    - optional: hapus file orig + overlay di storage
-    """
     if not client_id:
         raise ValueError("client_id wajib")
 
@@ -177,7 +151,6 @@ def delete_history_item(analysis_id: str, client_id: str, delete_files: bool = T
         orig_path = _safe_abs_path(row.orig_image_path)
         overlay_path = _safe_abs_path(row.seg_overlay_path)
 
-        # delete DB row dulu (biar konsisten dari sisi API)
         db.delete(row)
         db.commit()
 

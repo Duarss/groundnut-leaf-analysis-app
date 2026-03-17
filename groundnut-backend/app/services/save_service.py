@@ -1,21 +1,14 @@
 # app/services/save_service.py
 import json
 from datetime import datetime, timezone
-
 from sqlalchemy.exc import SQLAlchemyError
-
 from app.utils.temp_store import read_meta, find_image_path, delete_bundle
 from app.utils.storage_io import persist_file
 from app.database.db import SessionLocal
 from app.models.analysis_result import AnalysisResult
 from app.core.config import Config
 
-
 def _meta_created_at_dt(meta: dict) -> datetime:
-    """
-    meta["created_at"] sebelumnya epoch int.
-    DB sekarang pakai TIMESTAMP/DateTime.
-    """
     v = meta.get("created_at", None)
     try:
         if isinstance(v, (int, float)) and v > 0:
@@ -26,13 +19,6 @@ def _meta_created_at_dt(meta: dict) -> datetime:
 
 
 def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | None = None) -> dict:
-    """
-    Save hasil final analisis:
-    - client_id WAJIB dikirim dari route (jangan ambil dari request di service)
-
-    Perubahan: orig_image_path & seg_overlay_path sekarang disimpan lengkap:
-      "<client_id>/<analysis_id>/<filename>"
-    """
     client_id = (str(client_id).strip() if client_id is not None else "")
     if not client_id:
         raise ValueError("client_id wajib (untuk multi-user tanpa login).")
@@ -47,25 +33,21 @@ def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | No
     if label is None:
         raise ValueError("Meta classification tidak lengkap (label None).")
 
-    # original image wajib ada
     orig_tmp_path = find_image_path(analysis_id)
     if not orig_tmp_path:
         raise FileNotFoundError("File gambar original tidak ditemukan di tmp_uploads.")
 
-    # original image (persist)
     ext = orig_tmp_path.rsplit(".", 1)[-1].lower()
     orig_saved_path = persist_file(orig_tmp_path, client_id, analysis_id, f"orig.{ext}")
 
-    # segmentation info
     seg = meta.get("segmentation") or {}
     seg_enabled = bool(seg.get("enabled", False))
 
-    overlay_tmp_path = seg.get("overlay_path")  # boleh None
+    overlay_tmp_path = seg.get("overlay_path")
     overlay_saved_path = None
     if seg_enabled and overlay_tmp_path:
         overlay_saved_path = persist_file(overlay_tmp_path, client_id, analysis_id, "overlay.png")
 
-    # severity SAD
     sev = (seg.get("severity") or {}) if seg_enabled else {}
     severity_pct = sev.get("severity_pct", None)
 
@@ -73,7 +55,7 @@ def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | No
     sad_scheme = sad.get("scheme")
     sad_class_index = sad.get("class_index")
     sad_midpoint_pct = sad.get("midpoint_pct")
-    sad_range = sad.get("range_pct")  # [low, high]
+    sad_range = sad.get("range_pct")
     sad_range_low = None
     sad_range_high = None
     if isinstance(sad_range, (list, tuple)) and len(sad_range) == 2:
@@ -98,7 +80,6 @@ def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | No
 
             severity_pct=float(severity_pct) if severity_pct is not None else None,
             
-            # SAD fields
             sad_scheme=str(sad_scheme) if sad_scheme else None,
             sad_class_index=int(sad_class_index) if sad_class_index is not None else None,
             sad_midpoint_pct=float(sad_midpoint_pct) if sad_midpoint_pct is not None else None,
@@ -115,7 +96,6 @@ def save_analysis(analysis_id: str, client_id: str, delete_temp_after: bool | No
     finally:
         db.close()
 
-    # delete_temp_after: kalau None, pakai config
     if delete_temp_after is None:
         delete_temp_after = bool(Config.TEMP_DELETE_AFTER_SEG)
     if delete_temp_after:

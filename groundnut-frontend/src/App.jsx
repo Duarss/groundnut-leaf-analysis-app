@@ -17,7 +17,6 @@ const App = () => {
         <Route path="/" element={<HomePage />} />
         <Route path="/classify" element={<ClassifyPage />} />
         <Route path="/segment/:id" element={<SegmentPage />} />
-        {/* detail analisis (segmentasi + keparahan) untuk 1 hasil */}
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/history/:id" element={<HistoryDetailPage />} />

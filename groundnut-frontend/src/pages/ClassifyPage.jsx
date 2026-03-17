@@ -1,14 +1,31 @@
 // src/pages/ClassifyPage.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { classifyImage, saveAnalysis } from "../api/analysisApi";
+import { useNavigate } from "react-router-dom";
 import { useIsMobile } from "../utils/useIsMobile";
 import ImageBox from "../components/ui/ImageBox";
 import Toast from "../components/ui/Toast";
 
-// Catatan: Ini ringkasan gejala umum untuk membantu interpretasi hasil model.
+const CONFIDENCE_THRESHOLD = 0.6;
+
+const LABEL_ID = {
+  "ALTERNARIA LEAF SPOT": "Bercak Daun Alternaria",
+  "LEAF SPOT (EARLY AND LATE)": "Bercak Daun Tahap Awal & Akhir",
+  ROSETTE: "Roset",
+  RUST: "Karat Daun",
+  HEALTHY: "Sehat",
+};
+
+function labelBilingual(label) {
+  const key = String(label || "").trim().toUpperCase();
+  if (!key) return "-";
+  const norm = key === "LEAF SPOT" || key === "LEAFSPOT" ? "LEAF SPOT (EARLY AND LATE)" : key;
+  const id = LABEL_ID[norm];
+  return id ? `${norm} (${id})` : norm;
+}
+
 const LABEL_DESC = {
   "ALTERNARIA LEAF SPOT":
     "Umumnya muncul bercak cokelat hingga kehitaman pada daun, sering membentuk pola cincin konsentris (seperti ‘target spot’). Pada serangan berat dapat mempercepat penuaan/kerontokan daun.",
@@ -22,8 +39,6 @@ const LABEL_DESC = {
     "Daun tampak sehat tanpa gejala bercak, pustula karat, mosaik/klorosis berat, atau deformasi khas penyakit.",
 };
 
-const SHOW_DEBUG_PROBS = false;
-
 function _normLabelForInfo(label) {
   const s = String(label || "").trim().toUpperCase();
   if (!s) return "";
@@ -31,7 +46,6 @@ function _normLabelForInfo(label) {
   return s;
 }
 
-// helper: tunggu event/condition dengan timeout
 function waitForEvent(target, eventName, timeoutMs = 2500) {
   return new Promise((resolve) => {
     let done = false;
@@ -63,10 +77,14 @@ const ClassifyPage = () => {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
 
-  // UI mode: upload vs camera
   const [inputMode, setInputMode] = useState("upload"); // "upload" | "camera"
 
-  // Camera state
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [classifyBusy, setClassifyBusy] = useState(false);
+  const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
+  const [toast, setToast] = useState({ open: false, type: "info", message: "" });
+
   const [cameraPanelOpen, setCameraPanelOpen] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraErr, setCameraErr] = useState("");
@@ -75,15 +93,6 @@ const ClassifyPage = () => {
   const streamRef = useRef(null);
   const captureInputRef = useRef(null);
 
-  // Result state
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
-  const [saveStatus, setSaveStatus] = useState({ loading: false, msg: "", err: "" });
-  const [toast, setToast] = useState({ open: false, type: "info", message: "" });
-
-  const [classifyBusy, setClassifyBusy] = useState(false);
-
-  // Deskripsi Label (SAMA pola dengan HistoryDetailPage.jsx)
   const labelNorm = useMemo(() => _normLabelForInfo(result?.label), [result?.label]);
   const labelDesc = useMemo(
     () => (labelNorm ? LABEL_DESC[labelNorm] || "Deskripsi untuk label ini belum tersedia." : ""),
@@ -101,7 +110,6 @@ const ClassifyPage = () => {
     setCameraOn(false);
   };
 
-  // cleanup unmount
   useEffect(() => {
     return () => {
       stopCamera();
@@ -110,7 +118,6 @@ const ClassifyPage = () => {
         return "";
       });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSetSelectedFile = (selectedFile) => {
@@ -133,9 +140,6 @@ const ClassifyPage = () => {
     handleSetSelectedFile(selectedFile);
   };
 
-  // === Single action: "Buka Kamera"
-  // Jika getUserMedia ada -> buka panel & start stream
-  // Jika tidak ada / gagal -> fallback ke input capture device (tetap dari tombol yang sama)
   const openCamera = async () => {
     setCameraErr("");
     setCameraBusy(true);
@@ -168,7 +172,6 @@ const ClassifyPage = () => {
     setCameraErr("");
   };
 
-  // Start stream ketika panel kamera dibuka
   useEffect(() => {
     let cancelled = false;
 
@@ -242,7 +245,6 @@ const ClassifyPage = () => {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameraPanelOpen]);
 
   const captureFromCamera = async () => {
@@ -295,6 +297,19 @@ const ClassifyPage = () => {
     setClassifyBusy(true);
     try {
       const data = await classifyImage(file);
+
+      // ===== Threshold gate (0.60) =====
+      const conf = typeof data?.confidence === "number" ? data.confidence : null;
+      if (conf != null && conf < CONFIDENCE_THRESHOLD) {
+        const msg =
+          `Keyakinan prediksi rendah (${(conf * 100).toFixed(2)}%). ` +
+          `Silakan unggah ulang / foto ulang dengan gambar yang lebih sesuai dan jelas.`;
+        setResult(null);
+        setError(msg);
+        setToast({ open: true, type: "error", message: msg });
+        return;
+      }
+
       setResult(data);
     } catch (err) {
       setError(err?.message || "Gagal memproses klasifikasi.");
@@ -329,7 +344,6 @@ const ClassifyPage = () => {
     }
   };
 
-  // UI helpers
   const modeBtnStyle = (active) => ({
     flex: 1,
     justifyContent: "center",
@@ -391,7 +405,6 @@ const ClassifyPage = () => {
             <div>
               <Card title="Input" subtitle="Langkah 1 dari 2">
                 <form onSubmit={handleSubmit} className="upload-form">
-                  {/* hidden capture input (fallback kamera device) */}
                   <input
                     ref={captureInputRef}
                     type="file"
@@ -401,7 +414,6 @@ const ClassifyPage = () => {
                     style={{ display: "none" }}
                   />
 
-                  {/* Mode selector */}
                   <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                     <Button
                       type="button"
@@ -424,7 +436,6 @@ const ClassifyPage = () => {
                     </Button>
                   </div>
 
-                  {/* Upload panel */}
                   {inputMode === "upload" && (
                     <div style={panelStyle}>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
@@ -458,7 +469,6 @@ const ClassifyPage = () => {
                     </div>
                   )}
 
-                  {/* Camera panel */}
                   {inputMode === "camera" && (
                     <div style={panelStyle}>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
@@ -543,9 +553,6 @@ const ClassifyPage = () => {
               </Card>
             </div>
 
-            {/* =======================
-                Layout Langkah 2
-                ======================= */}
             <div>
               <Card title="Hasil Klasifikasi" subtitle="Langkah 2 dari 2">
                 {!result && !classifyBusy && (
@@ -553,6 +560,9 @@ const ClassifyPage = () => {
                     <div style={{ fontWeight: 800, marginBottom: 6 }}>Belum ada hasil</div>
                     <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.5 }}>
                       Pilih gambar pada langkah 1, lalu klik <b>Proses Klasifikasi</b>.
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
+                      Catatan: hasil hanya akan ditampilkan jika keyakinan prediksi ≥ {(CONFIDENCE_THRESHOLD * 100).toFixed(0)}%.
                     </div>
                   </div>
                 )}
@@ -582,7 +592,6 @@ const ClassifyPage = () => {
 
                 {result && (
                   <div style={{ display: "grid", gap: 12 }}>
-                    {/* Ringkasan */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                       <span style={pill(result.segmentation_ready ? "warn" : "good")}>
                         {result.segmentation_ready ? "Lanjut Segmentasi" : "Final (Sehat)"}
@@ -591,7 +600,7 @@ const ClassifyPage = () => {
 
                     <div style={kvRow}>
                       <span style={{ color: "#6b7280", fontWeight: 700 }}>Label</span>
-                      <span style={{ fontWeight: 900 }}>{result.label || "-"}</span>
+                      <span style={{ fontWeight: 900 }}>{labelBilingual(result.label)}</span>
                     </div>
 
                     <div style={kvRow}>
@@ -601,7 +610,6 @@ const ClassifyPage = () => {
                       </span>
                     </div>
 
-                    {/* Deskripsi Label */}
                     {labelNorm && (
                       <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fff" }}>
                         <div style={{ fontWeight: 900, marginBottom: 8 }}>Deskripsi Label</div>
@@ -610,26 +618,6 @@ const ClassifyPage = () => {
                         </div>
                         <div style={{ marginTop: 10, fontSize: 12, color: "#6b7280" }}>
                           Catatan: deskripsi ini adalah ringkasan gejala umum untuk membantu interpretasi hasil model.
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ===== Debug probs (tidak tampil default) ===== */}
-                    {SHOW_DEBUG_PROBS && result.probs && (
-                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fff" }}>
-                        <div style={{ fontWeight: 900, marginBottom: 8 }}>Debug Probabilitas</div>
-                        <div style={{ display: "grid", gap: 6 }}>
-                          {Object.entries(result.probs)
-                            .sort((a, b) => b[1] - a[1])
-                            .map(([cls, p]) => (
-                              <div
-                                key={cls}
-                                style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#111827" }}
-                              >
-                                <span>{cls}</span>
-                                <span style={{ fontVariantNumeric: "tabular-nums" }}>{(Number(p) * 100).toFixed(2)}%</span>
-                              </div>
-                            ))}
                         </div>
                       </div>
                     )}
@@ -670,7 +658,6 @@ const ClassifyPage = () => {
         </Card>
       </div>
 
-      {/* anim keyframes (inline) */}
       <style>{`
         @keyframes pulse {
           0% { transform: translateX(-20%); opacity: .65; }

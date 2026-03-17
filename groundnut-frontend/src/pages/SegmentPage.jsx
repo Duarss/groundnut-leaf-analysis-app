@@ -43,7 +43,6 @@ const SegmentPage = () => {
   const [sadScheme, setSadScheme] = useState("");
   const [sadClassIndex, setSadClassIndex] = useState(null);
   const [sadRange, setSadRange] = useState(null);
-  // const [sadMidpoint, setSadMidpoint] = useState(null);
 
   const [leafMaskSrc, setLeafMaskSrc] = useState("");
   const [showLeafMask, setShowLeafMask] = useState(false);
@@ -124,7 +123,6 @@ const SegmentPage = () => {
     setSadScheme("");
     setSadClassIndex(null);
     setSadRange(null);
-    // setSadMidpoint(null);
 
     setLeafMaskSrc("");
     setShowLeafMask(false);
@@ -158,11 +156,9 @@ const SegmentPage = () => {
 
       const sev = data?.severity || null;
       if (sev) {
-        // severity pct
         const pct = _numOrNull(sev?.severity_pct);
         setSeverityPct(pct);
 
-        // SAD (HB)
         const sad = sev?.sad || sev?.SAD || null;
 
         const scheme = (sad?.scheme || "").toString();
@@ -175,10 +171,6 @@ const SegmentPage = () => {
         if (Array.isArray(rng) && rng.length === 2) setSadRange([Number(rng[0]), Number(rng[1])]);
         else setSadRange(null);
 
-        // const mid = _numOrNull(sad?.midpoint_pct ?? sad?.midpoint);
-        // setSadMidpoint(mid);
-
-        // leaf mask (opsional)
         const leafMaskB64 = sev?.leaf_mask_png_base64;
         if (leafMaskB64) setLeafMaskSrc(`data:image/png;base64,${leafMaskB64}`);
         else {
@@ -190,8 +182,6 @@ const SegmentPage = () => {
         setSadScheme("");
         setSadClassIndex(null);
         setSadRange(null);
-        // setSadMidpoint(null);
-
         setLeafMaskSrc("");
         setShowLeafMask(false);
       }
@@ -233,7 +223,6 @@ const SegmentPage = () => {
     if (sadClassIndex == null || Number.isNaN(sadClassIndex)) return "-";
     const cls = `Kelas SAD ${Math.round(sadClassIndex)}`;
     const range = Array.isArray(sadRange) && sadRange.length === 2 ? ` (rentang ${sadRange[0]}–${sadRange[1]}%)` : "";
-    // const mid = sadMidpoint != null ? ` • midpoint ${sadMidpoint.toFixed(1)}%` : "";
     return `${cls}${range}`;
   }, [sadClassIndex, sadRange]);
 

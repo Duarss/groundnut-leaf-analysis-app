@@ -1,13 +1,8 @@
 // src/api/analysisApi.js
 import { getClientId } from "../utils/clientId";
 
-// Header untuk bypass halaman warning ngrok (free domain)
-const NGROK_SKIP_HEADER = { "ngrok-skip-browser-warning": "true" };
-
-// Helper fetch dengan default header ngrok-skip
 async function _fetch(url, opts = {}) {
   const headers = {
-    ...NGROK_SKIP_HEADER,
     ...(opts.headers || {}),
   };
   return fetch(url, { ...opts, headers });

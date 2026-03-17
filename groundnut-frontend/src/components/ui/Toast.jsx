@@ -2,12 +2,7 @@
 import React, { useEffect } from "react";
 
 export default function Toast({
-  open,
-  type = "info", // "success" | "error" | "info"
-  message,
-  onClose,
-  duration = 2500,
-}) {
+  open, type = "info", message, onClose, duration = 2500, }) {
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => onClose?.(), duration);
@@ -28,25 +23,15 @@ export default function Toast({
       role="status"
       aria-live="polite"
       style={{
-        position: "fixed",
-        right: 16,
-        top: 16,
-        zIndex: 9999,
-        maxWidth: 380,
-        width: "calc(100% - 32px)",
+        position: "fixed", right: 16, top: 16, zIndex: 9999,
+        maxWidth: 380, width: "calc(100% - 32px)",
       }}
     >
       <div
         style={{
-          background: bg,
-          border: `1px solid ${border}`,
-          color: text,
-          borderRadius: 14,
-          padding: "12px 12px",
-          boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
-          display: "flex",
-          gap: 10,
-          alignItems: "flex-start",
+          background: bg, border: `1px solid ${border}`, color: text,
+          borderRadius: 14, boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
+          padding: "12px 12px", display: "flex", alignItems: "flex-start", gap: 10, 
         }}
       >
         <div style={{ fontWeight: 900, lineHeight: 1.2 }}>
@@ -59,13 +44,8 @@ export default function Toast({
           onClick={onClose}
           aria-label="Tutup"
           style={{
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-            fontSize: 18,
-            lineHeight: 1,
-            padding: 2,
-            color: text,
+            border: "none", background: "transparent", cursor: "pointer",
+            fontSize: 18, lineHeight: 1, padding: 2, color: text,
           }}
         >
           ×

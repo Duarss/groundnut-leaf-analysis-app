@@ -67,11 +67,12 @@ const GuidePage = () => {
         content: (
           <>
             <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
-              <li>✅ Objek adalah foto daun kacang tanah</li>
+              <li>✅ Objek adalah foto daun/tanaman kacang tanah (objek utama jelas)</li>
               <li>✅ Daun terlihat jelas (tidak buram) dan cukup terang</li>
-              <li>✅ Daun mengisi sebagian besar area foto</li>
+              <li>✅ Objek utama mengisi sebagian besar area foto</li>
+              <li>✅ Usahakan hanya satu tanaman/objek utama dalam satu foto</li>
+              <li>✅ Hindari objek lain yang dominan atau menutupi area gejala</li>
               <li>✅ Latar belakang polos/kontras, tidak ramai</li>
-              <li>✅ Hindari ada daun lain yang menutupi daun utama</li>
               <li>✅ Hindari bayangan keras dan pantulan cahaya</li>
             </ul>
             <p style={{ color: "#6b7280", marginTop: 10, marginBottom: 0 }}>
@@ -189,10 +190,16 @@ const GuidePage = () => {
           <>
             <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginTop: 0 }}>
               <li>Foto terlalu gelap atau buram.</li>
-              <li>Daun terlalu kecil di foto.</li>
-              <li>Banyak daun saling menutupi.</li>
+              <li>Objek utama terlalu kecil di foto.</li>
               <li>Background terlalu ramai atau warnanya mirip daun.</li>
               <li>Ada pantulan cahaya kuat/bayangan keras.</li>
+              <li>
+                Dalam satu foto terdapat lebih dari satu jenis penyakit atau gejala campuran pada objek
+                utama (model dilatih dengan satu label per gambar).
+              </li>
+              <li>
+                Terdapat banyak objek/tanaman dalam satu frame sehingga area gejala sulit dipisahkan.
+              </li>
             </ul>
             <p style={{ color: "#6b7280", marginBottom: 0 }}>
               Jika hasil kurang sesuai, ulangi dengan foto yang lebih jelas dan mengikuti checklist.
@@ -210,16 +217,13 @@ const GuidePage = () => {
   const [openAll, setOpenAll] = useState(!isMobile);
 
   // Mobile initial: buka "tujuan"
-  // Desktop saat openAll=true, openIds tidak berpengaruh (tapi tetap dipakai saat keluar dari openAll)
   const [openIds, setOpenIds] = useState(isMobile ? ["tujuan"] : []);
 
   const isSectionOpen = (id) => (openAll ? true : openIds.includes(id));
 
   const onToggle = (id) => {
-    // Desktop: jika sedang openAll, klik salah satu section => keluar dari openAll dan close/open section itu secara natural
     if (!isMobile && openAll) {
       setOpenAll(false);
-      // semua tadinya terbuka, jadi toggle berarti "tutup section id" (yang lain tetap terbuka)
       setOpenIds(allIds.filter((x) => x !== id));
       return;
     }
@@ -228,7 +232,6 @@ const GuidePage = () => {
       if (isMobile) {
         return prev[0] === id ? [] : [id];
       }
-      // desktop: multi-open
       return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
     });
   };
@@ -238,15 +241,21 @@ const GuidePage = () => {
       const next = !prev;
 
       if (next) {
-        // masuk openAll: tidak perlu ubah openIds
         return true;
       }
 
-      // keluar openAll: set default biar tidak kosong
       setOpenIds(["tujuan"]);
       return false;
     });
   };
+
+  {!isMobile && (
+    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+      <Button variant="secondary" onClick={toggleOpenAllDesktop}>
+        {openAll ? "Tutup semua" : "Buka semua"}
+      </Button>
+    </div>
+  )}
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>

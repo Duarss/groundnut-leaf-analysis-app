@@ -9,20 +9,33 @@ import { fetchHistoryList, deleteHistoryItem } from "../api/historyApi";
 import { formatJakartaTime } from "../utils/dateTime";
 import { useIsMobile } from "../utils/useIsMobile";
 
-// function fmtConfPct(x) {
-//   if (x === null || x === undefined) return "-";
-//   const n = Number(x);
-//   if (Number.isNaN(n)) return "-";
-//   return `${(n * 100).toFixed(2)}%`;
-// }
+const LABEL_ID = {
+  "ALTERNARIA LEAF SPOT": "Bercak Daun Alternaria",
+  "LEAF SPOT (EARLY AND LATE)": "Bercak Daun Tahap Awal & Akhir",
+  ROSETTE: "Roset",
+  RUST: "Karat Daun",
+  HEALTHY: "Sehat",
+};
+
+function normLabel(label) {
+  const key = String(label || "").trim().toUpperCase();
+  if (!key) return "-";
+  if (key === "LEAF SPOT" || key === "LEAFSPOT") return "LEAF SPOT (EARLY AND LATE)";
+  return key;
+}
+
+function labelBilingual(label) {
+  const k = normLabel(label);
+  if (k === "-") return "-";
+  const id = LABEL_ID[k];
+  return id ? `${k} (${id})` : k;
+}
 
 function numOrNull(v) {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
 }
 
-// ===== SAD helpers =====
-// item bisa punya: severity_sad_class_index / sad_class_index / sad?.class_index
 function getSadClassIndex(it) {
   const a =
     it?.severity_sad_class_index ??
@@ -35,21 +48,13 @@ function getSadClassIndex(it) {
   const n = numOrNull(a);
   if (n == null) return null;
 
-  // HB classes umumnya 0..11
   const idx = Math.round(n);
-  if (idx < 0 || idx > 11) return idx; // tetap tampilkan, walau out of range
+  if (idx < 0 || idx > 11) return idx;
   return idx;
 }
 
-// function fmtSeverityPct(it) {
-//   const p = numOrNull(it?.severity_pct);
-//   if (p == null) return "-";
-//   return `${p.toFixed(2)}%`;
-// }
-
 function severityBadgeStyleByPct(pct) {
   if (pct == null) return { background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb" };
-  // sederhana: makin tinggi makin "merah"
   if (pct >= 60) return { background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" };
   if (pct >= 20) return { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" };
   return { background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" };
@@ -64,9 +69,7 @@ function SeverityBadge({ item }) {
   if (cls == null && pct == null) return <span style={{ color: "#6b7280" }}>-</span>;
 
   const st = severityBadgeStyleByPct(pct);
-
-  const label =
-    cls != null ? `SAD C${cls}` : "SAD";
+  const label = cls != null ? `SAD C${cls}` : "SAD";
 
   const titleParts = [];
   if (pct != null) titleParts.push(`Keparahan: ${pct.toFixed(2)}%`);
@@ -101,17 +104,11 @@ const HistoryPage = () => {
   const location = useLocation();
 
   const [toast, setToast] = useState({ open: false, type: "info", message: "" });
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
 
-  const [deletingId, setDeletingId] = useState(null);
-
-  // Modal state
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-
-  // Pagination
   const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(null);
@@ -123,8 +120,7 @@ const HistoryPage = () => {
       setToast({ open: true, type: t.type || "info", message: t.message });
       nav(location.pathname, { replace: true, state: {} });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state]);
+  }, [location.pathname, location.state, nav]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -199,6 +195,10 @@ const HistoryPage = () => {
     setPage(1);
   }
 
+  const [deletingId, setDeletingId] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+
   function openDeleteModal(it) {
     if (!it?.analysis_id) return;
     setSelectedItem(it);
@@ -254,7 +254,7 @@ const HistoryPage = () => {
         title="Hapus riwayat analisis?"
         description={
           selectedItem
-            ? `Item dengan label "${(selectedItem?.label ?? "-") + " - " + (selectedItem?.analysis_id ?? "-")}" akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`
+            ? `Item dengan label "${labelBilingual(selectedItem?.label)} - ${(selectedItem?.analysis_id ?? "-")}" akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`
             : "Item akan dihapus permanen. Tindakan ini tidak bisa dibatalkan."
         }
         confirmText="Ya, hapus"
@@ -267,9 +267,7 @@ const HistoryPage = () => {
 
       <Card title="Riwayat Analisis">
         {loading && <p>Memuat...</p>}
-
         {!loading && errMsg && <p style={{ color: "crimson", margin: 0 }}>{errMsg}</p>}
-
         {!loading && !errMsg && !hasItems && <p style={{ margin: 0 }}>Belum ada data tersimpan</p>}
 
         {!loading && hasItems && (
@@ -347,7 +345,9 @@ const HistoryPage = () => {
                       {formatJakartaTime(it.created_at)} (WIB)
                     </div>
 
-                    <div style={{ fontSize: 16, fontWeight: 900, marginTop: 4 }}>{it.label ?? "-"}</div>
+                    <div style={{ fontSize: 16, fontWeight: 900, marginTop: 4 }}>
+                      {labelBilingual(it.label)}
+                    </div>
 
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
                       <SeverityBadge item={it} />
@@ -384,7 +384,7 @@ const HistoryPage = () => {
                     {items.map((it) => (
                       <tr key={it.analysis_id}>
                         <td style={td}>{formatJakartaTime(it.created_at)}</td>
-                        <td style={td}>{it.label ?? "-"}</td>
+                        <td style={td}>{labelBilingual(it.label)}</td>
                         <td style={td}>
                           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                             <SeverityBadge item={it} />
@@ -393,7 +393,6 @@ const HistoryPage = () => {
                         <td style={td}>
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <Button onClick={() => nav(`/history/${it.analysis_id}`)}>Detail</Button>
-
                             <Button
                               style={{ background: "#ef4444" }}
                               disabled={deletingId === it.analysis_id}

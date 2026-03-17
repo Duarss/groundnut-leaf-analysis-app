@@ -1,19 +1,14 @@
 // src/api/historyApi.js
 import { getClientId } from "../utils/clientId";
 
-// Header untuk bypass halaman warning ngrok (free domain)
-const NGROK_SKIP_HEADER = { "ngrok-skip-browser-warning": "true" };
-
 async function _fetchJson(url, opts = {}) {
   const headers = {
-    ...NGROK_SKIP_HEADER,
     ...(opts.headers || {}),
     "X-Client-Id": getClientId(),
   };
 
   const res = await fetch(url, { ...opts, headers });
 
-  // jangan crash kalau response bukan JSON
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {

@@ -26,12 +26,7 @@ def _write_png_bytes(path: str, png_bytes: bytes) -> str:
         f.write(png_bytes)
     return path
 
-
 def _png_bytes_from_mask01(mask01_uint8: np.ndarray) -> bytes:
-    """
-    mask01_uint8: (H,W) uint8 {0,1} atau {0,255}
-    return PNG bytes grayscale L (0/255)
-    """
     m = np.asarray(mask01_uint8).astype(np.uint8)
     if m.size > 0 and m.max() <= 1:
         m = m * 255
@@ -44,23 +39,15 @@ def _decode_b64_png_to_pil(b64_str: str) -> Image.Image:
     raw = base64.b64decode(b64_str)
     return Image.open(io.BytesIO(raw)).convert("RGB")
 
-
 def _encode_pil_to_b64_png(img: Image.Image) -> str:
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
-
 def _rotate_mask_back(mask_hw: np.ndarray, rotated: bool) -> np.ndarray:
-    """
-    Jika input portrait kita ROTATE_90 (CCW) sebelum model,
-    maka output mask perlu ROTATE_270 (CCW) agar kembali ke orientasi semula.
-    Numpy: rot90(k=3) = 270 CCW.
-    """
     if not rotated:
         return mask_hw
     return np.rot90(mask_hw, k=3)
-
 
 def _write_overlay_png_to_tmp(analysis_id: str, overlay_b64: str) -> str:
     if not overlay_b64:
@@ -69,7 +56,6 @@ def _write_overlay_png_to_tmp(analysis_id: str, overlay_b64: str) -> str:
     out_path = os.path.join(Config.TEMP_DIR, f"{analysis_id}_overlay.png")
     _write_png_bytes(out_path, base64.b64decode(overlay_b64))
     return out_path
-
 
 def segment_infected_areas(analysis_id: str):
     meta = read_meta(analysis_id)
@@ -88,18 +74,14 @@ def segment_infected_areas(analysis_id: str):
         raise ValueError("Label klasifikasi tidak ditemukan. Silahkan lakukan klasifikasi ulang.")
 
     label_norm = str(label).strip().upper()
-
     img_bytes = read_image_bytes(analysis_id)
     seg_batch, rotated_flag = load_image_for_segmentation(img_bytes, return_rotated=True)
 
-    # NOTE: predict_infected_areas kamu HARUS mengembalikan infected_mask_bin jika diminta.
-    # Kalau fungsi kamu belum punya param return_mask, ubah di predict.py sesuai yang sudah kita bahas sebelumnya.
     seg_result = predict_infected_areas(seg_batch, label_norm, return_mask=True)
 
     meta["stage"] = meta.get("stage", "classified")
 
     if seg_result.get("enabled"):
-        # 1) overlay
         overlay_b64 = seg_result.get("overlay_png_base64")
         if overlay_b64:
             try:
@@ -108,24 +90,18 @@ def segment_infected_areas(analysis_id: str):
                 overlay_b64 = _encode_pil_to_b64_png(over_img)
                 seg_result["overlay_png_base64"] = overlay_b64
             except Exception:
-                # gagal decode/rotate/encode: biarkan apa adanya
                 pass
 
             overlay_path = _write_overlay_png_to_tmp(analysis_id, overlay_b64)
             seg_result["overlay_path"] = overlay_path
 
-        # 2) infected mask -> simpan file tmp (untuk severity + opsional debugging)
         infected_mask_bin = seg_result.get("infected_mask_bin", None)
         if infected_mask_bin is None:
             raise RuntimeError("predict_infected_areas() tidak mengembalikan infected_mask_bin.")
         
         infected_mask_bin = np.asarray(infected_mask_bin).astype(np.uint8)
-
         infected_mask_path = os.path.join(Config.TEMP_DIR, f"{analysis_id}_infected_mask.png")
-        # mask untuk hitung severity harus SEARAH dengan seg_batch (orientasi model)
-        infected_mask_for_calc = infected_mask_bin  # (H,W) sesuai seg_batch
-
-        # mask untuk disimpan/ditampilkan boleh rotate balik
+        infected_mask_for_calc = infected_mask_bin
         infected_mask_to_save = _rotate_mask_back(infected_mask_bin, rotated_flag)
 
         png_bytes = _png_bytes_from_mask01(infected_mask_to_save)
@@ -136,20 +112,16 @@ def segment_infected_areas(analysis_id: str):
         if SEND_INFECTED_MASK_B64:
             seg_result["infected_mask_png_base64"] = base64.b64encode(png_bytes).decode("utf-8")
 
-        # jangan simpan array besar ke JSON/meta
         seg_result.pop("infected_mask_bin", None)
 
-        # severity pakai infected_mask_for_calc
         severity_out = estimate_severity(seg_batch, infected_mask_bin=infected_mask_for_calc)
 
         if isinstance(severity_out, dict):
-            # leaf mask untuk tombol opsional "Lihat mask daun"
             leaf_mask_bin = severity_out.get("leaf_mask_bin")
 
             if leaf_mask_bin is not None:
                 leaf_mask_arr = np.asarray(leaf_mask_bin, dtype=np.uint8)
 
-                # rotate back agar orientasi leaf mask sama dengan original/overlay
                 leaf_mask_arr_to_save = _rotate_mask_back(leaf_mask_arr, rotated_flag)
                 leaf_mask_path = os.path.join(Config.TEMP_DIR, f"{analysis_id}_leaf_mask.png")
                 png_leaf = _png_bytes_from_mask01(leaf_mask_arr_to_save)
@@ -159,10 +131,8 @@ def segment_infected_areas(analysis_id: str):
                 severity_out["leaf_mask_path"] = leaf_mask_path
                 severity_out["leaf_mask_png_base64"] = base64.b64encode(png_leaf).decode("utf-8")
 
-                # jangan bawa array besar ke meta
                 severity_out.pop("leaf_mask_bin", None)
 
-            # pastikan tidak ada numpy object nyempil
             for k in list(severity_out.keys()):
                 v = severity_out.get(k)
                 if isinstance(v, np.ndarray):

@@ -18,16 +18,13 @@ def _load_best_tuned_cfg():
     if not path or not os.path.exists(path):
         raise FileNotFoundError(
             f"best_tuned_cfg.json not found. Expected at: {path}. "
-            "Please copy models/classification/best_tuned_cfg.json from training output."
         )
     with open(path, "r") as f:
         cfg = json.load(f)
 
-    # minimal validation
     if "head" not in cfg or "head_type" not in cfg["head"]:
         raise ValueError("best_tuned_cfg.json invalid: missing cfg['head']['head_type']")
     return cfg
-
 
 def _apply_head(x, head_cfg, num_classes):
     head_type = str(head_cfg.get("head_type"))
@@ -68,14 +65,13 @@ def build_classification_model():
     cfg = _load_best_tuned_cfg()
 
     base = EfficientNetB4(
-        weights=None,
+        weights="imagenet",
         include_top=False,
         input_shape=(img_size[0], img_size[1], 3),
     )
     out = _apply_head(base.output, cfg["head"], Config.CLSF_NUM_CLASSES)
     model = Model(inputs=base.input, outputs=out, name="EffNetB4_Classifier")
     return model
-
 
 def get_classification_model():
     global _model

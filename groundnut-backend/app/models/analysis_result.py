@@ -15,22 +15,17 @@ class AnalysisResult(Base):
         nullable=False
     )
 
-    # image refs
     orig_image_path = Column(Text, nullable=False)
 
-    # classification
     label = Column(String(128), nullable=False)
     confidence = Column(Float, nullable=True)
     probs_json = Column(Text, nullable=True)
 
-    # segmentation (optional)
     seg_enabled = Column(Boolean, nullable=False, default=False)
     seg_overlay_path = Column(Text, nullable=True)
 
-    # severity (optional, hanya kalau segmentasi jalan)
     severity_pct = Column(Float, nullable=True)
     
-    # SAD (Horsfall–Barratt) fields (ordinal-scale)
     sad_scheme = Column(String(128), nullable=True)
     sad_class_index = Column(Integer, nullable=True)
     sad_midpoint_pct = Column(Float, nullable=True)

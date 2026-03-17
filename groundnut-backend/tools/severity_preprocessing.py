@@ -1,17 +1,12 @@
 # tools/severity_preprocessing.py
 import argparse
 import os
+import numpy as np
 from pathlib import Path
 import cv2
-import numpy as np
-
-try:
-    from tqdm import tqdm
-except Exception:
-    tqdm = None
+from tqdm import tqdm
 
 VALID_EXT = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp")
-
 
 # ============================================================
 # BASIC HELPERS
@@ -20,61 +15,18 @@ VALID_EXT = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp")
 def ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
 
-
 def list_images(d: Path):
     if not d.exists():
         return []
     return sorted([p for p in d.iterdir() if p.suffix.lower() in VALID_EXT])
-
 
 def k(sz: int):
     return cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (sz, sz))
 
 
 # ============================================================
-# MASK UTILITIES
-# ============================================================
-
-def fill_holes(mask_255: np.ndarray) -> np.ndarray:
-    """Fill internal holes so lesions remain part of leaf mask."""
-    h, w = mask_255.shape
-    m = (mask_255 > 0).astype(np.uint8) * 255
-    inv = cv2.bitwise_not(m)
-    flood = inv.copy()
-    ff = np.zeros((h + 2, w + 2), np.uint8)
-    cv2.floodFill(flood, ff, (0, 0), 255)
-    return cv2.bitwise_or(m, cv2.bitwise_not(flood))
-
-
-def remove_small_components(mask_255: np.ndarray, min_area_px: int) -> np.ndarray:
-    m = (mask_255 > 0).astype(np.uint8)
-    n, lbl, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
-    out = np.zeros_like(mask_255, dtype=np.uint8)
-    for i in range(1, n):
-        if int(stats[i, cv2.CC_STAT_AREA]) >= min_area_px:
-            out[lbl == i] = 255
-    return out
-
-
-def apply_mask(img_bgr: np.ndarray, mask_255: np.ndarray) -> np.ndarray:
-    m = (mask_255 > 0).astype(np.uint8)
-    return img_bgr * np.repeat(m[:, :, None], 3, axis=2)
-
-
-# ============================================================
 # HAND / SKIN VETO
 # ============================================================
-
-def skin_mask_ycrcb(bgr: np.ndarray) -> np.ndarray:
-    ycrcb = cv2.cvtColor(bgr, cv2.COLOR_BGR2YCrCb)
-    Y, Cr, Cb = cv2.split(ycrcb)
-    m = (Cr >= 135) & (Cr <= 180) & (Cb >= 85) & (Cb <= 135) & (Y >= 40)
-    m = m.astype(np.uint8)
-    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, k(5), iterations=1)
-    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, k(7), iterations=1)
-    return m
-
-
 def overlap_ratio(a01: np.ndarray, b01: np.ndarray) -> float:
     denom = float(a01.sum())
     if denom <= 0:
@@ -183,24 +135,6 @@ def build_amg(args):
     )
     return amg, device
 
-
-# ============================================================
-# POST-PROCESS
-# ============================================================
-
-def finalize_mask(union01: np.ndarray, args) -> np.ndarray:
-    m = (union01 > 0).astype(np.uint8) * 255
-
-    if args.close_ksize > 0:
-        m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, k(args.close_ksize), iterations=1)
-
-    if not args.no_fill_holes:
-        m = fill_holes(m)
-
-    m = remove_small_components(m, args.final_min_area_px)
-    return m
-
-
 # ============================================================
 # AUGMENTATION (TRAIN ONLY)
 # ============================================================
@@ -226,11 +160,9 @@ def augment_train_split(root: Path):
         if img is None or mask is None:
             continue
 
-        # Horizontal
         cv2.imwrite(str(train_img / f"{ip.stem}_hflip{ip.suffix}"), cv2.flip(img, 1))
         cv2.imwrite(str(train_mask / f"{ip.stem}_hflip.png"), cv2.flip(mask, 1))
 
-        # Vertical
         cv2.imwrite(str(train_img / f"{ip.stem}_vflip{ip.suffix}"), cv2.flip(img, 0))
         cv2.imwrite(str(train_mask / f"{ip.stem}_vflip.png"), cv2.flip(mask, 0))
 
@@ -268,10 +200,6 @@ def main():
     ap.add_argument("--w_sol", type=float, default=1.0)
     ap.add_argument("--w_circ", type=float, default=0.2)
     ap.add_argument("--w_skin", type=float, default=4.0)
-
-    ap.add_argument("--close_ksize", type=int, default=9)
-    ap.add_argument("--final_min_area_px", type=int, default=600)
-    ap.add_argument("--no_fill_holes", action="store_true")
 
     args = ap.parse_args()
     root = Path(args.root)

@@ -9,7 +9,6 @@ from app.core.config import Config
 
 bp = Blueprint("analyze", __name__)
 
-
 def _get_client_id():
     cid = request.headers.get("X-Client-Id")
     if cid:
@@ -50,7 +49,6 @@ def segment():
     except Exception as e:
         return jsonify({"error": "Proses segmentasi gagal!", "detail": str(e)}), 500
 
-
 @bp.route("/save", methods=["POST"])
 def save():
     data = request.get_json(silent=True) or {}
@@ -73,7 +71,6 @@ def save():
     except Exception as e:
         return jsonify({"saved": False, "error": str(e)}), 500
 
-
 @bp.route("/history", methods=["GET"])
 def history_list():
     cid = _get_client_id()
@@ -92,7 +89,6 @@ def history_list():
     except Exception as e:
         return jsonify({"error": "Gagal mengambil history", "detail": str(e)}), 500
 
-
 @bp.route("/history/<analysis_id>", methods=["GET"])
 def history_detail(analysis_id):
     try:
@@ -104,7 +100,6 @@ def history_detail(analysis_id):
     except Exception as e:
         return jsonify({"error": "Gagal mengambil detail history", "detail": str(e)}), 500
     
-
 @bp.route("/history/<analysis_id>", methods=["DELETE"])
 def history_delete(analysis_id):
     cid = _get_client_id()
@@ -119,15 +114,8 @@ def history_delete(analysis_id):
     except Exception as e:
         return jsonify({"error": "Gagal menghapus history", "detail": str(e)}), 500
 
-
 @bp.route("/temp-image/<analysis_id>", methods=["GET"])
 def temp_image(analysis_id):
-    """
-    Serve original image dari tmp_uploads berdasarkan analysis_id.
-    Dipakai oleh SegmentPage agar tidak bergantung pada sessionStorage.
-
-    GET /api/temp-image/<analysis_id>
-    """
     try:
         p = find_image_path(analysis_id)
         if not p:
