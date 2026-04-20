@@ -1,0 +1,48 @@
+{
+  "model": "UNet_EfficientNetB0",
+  "img_size": [
+    480,
+    640
+  ],
+  "run_type": "global4",
+  "only_class": null,
+  "class_names": [
+    "ALTERNARIA LEAF SPOT",
+    "LEAF SPOT (EARLY AND LATE)",
+    "ROSETTE",
+    "RUST"
+  ],
+  "selected_cfg": {
+    "mix_full_ratio": 1.0,
+    "lr": 7e-05,
+    "train_encoder": true,
+    "tv_w": 0.1,
+    "bce_w": 0.9,
+    "tv_alpha": 0.1,
+    "tv_beta": 0.9,
+    "use_focal": true,
+    "bot_dropout": 0.0,
+    "dec_dropout": 0.0,
+    "freeze_bn": true
+  },
+  "cfg_source": "models/segmentation/best_tuned_cfg.json",
+  "train_split": "train_roi",
+  "val_split": "val",
+  "test_split": "test",
+  "monitor": {
+    "metric": "val_dice50",
+    "mode": "max"
+  },
+  "constraints": {
+    "tv_w+bce_w": 1.0,
+    "tv_alpha+tv_beta": 1.0
+  },
+  "paths": {
+    "best_weights": "models/segmentation\\best_global_segmentation_model.weights.h5",
+    "history_json": "models/segmentation\\best_global_segmentation_model_hist.json",
+    "spec_json": "models/segmentation\\best_global_segmentation_model_spec.json",
+    "curve_loss_png": "models/segmentation\\best_global_segmentation_model_curve_loss.png",
+    "curve_dice_png": "models/segmentation\\best_global_segmentation_model_curve_dice.png",
+    "curve_iou_png": "models/segmentation\\best_global_segmentation_model_curve_iou.png"
+  }
+}

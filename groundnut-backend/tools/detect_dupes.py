@@ -3,7 +3,7 @@ import os
 from PIL import Image
 import imagehash
 
-LABEL_CLASS = ""
+LABEL_CLASS = "RUST"
 FOLDER = rf"C:\laragon\www\TA\groundnut-leaf-analysis-app\groundnut-backend\datasets\raw\ori_dataset\{LABEL_CLASS}"
 RECURSIVE = False
 HASH_DISTANCE_THRESHOLD = 10

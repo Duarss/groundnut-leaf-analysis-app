@@ -19,18 +19,16 @@ TARGET_DIR = "datasets/processed/classification_dataset"
 VALID_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff")
 
 # ===================== Prinsip ilmiah balancing =====================
-R_MAX = 5
+# R_MAX > 0  : target dibatasi oleh R_MAX * n_min (dengan guard median)
+# R_MAX <= 0 : auto ikuti kelas mayoritas (target = n_max), seperti pipeline segmentasi
+R_MAX = 0
 MIN_TRAIN_TARGET = 80
 MAX_TRAIN_TARGET = 1000
 
-VAL_BALANCING = True
-VAL_BALANCING_MODE = "downsample"
-VAL_TARGET_PER_CLASS = None
-
 # ===================== Anti-duplicate augmentation gate =====================
 FINGERPRINT_SIZE = (32, 32)
-MAX_TRIES_PER_AUG = 25       
-DUP_SKIP_LOG_EVERY = 200      
+MAX_TRIES_PER_AUG = 25
+DUP_SKIP_LOG_EVERY = 200
 
 def image_fingerprint(pil_img: Image.Image) -> str:
     im = pil_img.convert("L").resize(FINGERPRINT_SIZE, Image.BILINEAR)
@@ -59,7 +57,8 @@ def safe_reset_dir(path):
     os.makedirs(path, exist_ok=True)
 
 def list_dirs(path):
-    blacklist = {"train", "val", "train_balanced"}
+    # folder split dan output balancing tidak dianggap sebagai folder kelas
+    blacklist = {"train", "val", "test", "train_balanced"}
     dirs = []
     if not os.path.exists(path):
         return dirs
@@ -86,7 +85,7 @@ def deterministic_sample(imgs, k, class_name, base_seed=GLOBAL_SEED):
 
 def print_class_summary(root, split_name):
     total = 0
-    print(f"\n{split_name.upper()}_BALANCED summary:")
+    print(f"\n{split_name.upper()} summary:")
     if not os.path.exists(root):
         print("  (folder tidak ditemukan)")
         return
@@ -95,6 +94,17 @@ def print_class_summary(root, split_name):
         total += n
         print(f"  {cls:<27}: {n:5d}")
     print(f"  Total{'':23}: {total:5d}")
+
+def print_split_overview():
+    print("\n=== Overview split dataset klasifikasi ===")
+    for split in ["train", "val", "test"]:
+        split_dir = os.path.join(SOURCE_DIR, split)
+        if os.path.exists(split_dir):
+            print_class_summary(split_dir, split)
+        else:
+            print(f"\n{split.upper()} summary:")
+            print("  (folder tidak ditemukan)")
+    print("==========================================\n")
 
 # ===================== Hitung target balance TRAIN =====================
 def compute_train_target(train_dir):
@@ -109,21 +119,33 @@ def compute_train_target(train_dir):
 
     values = list(counts.values())
     n_min = min(values)
+    n_max = max(values)
     n_med = int(median(values))
 
-    raw_target = min(n_med, int(R_MAX * n_min))
-    target = max(MIN_TRAIN_TARGET, min(MAX_TRAIN_TARGET, raw_target))
+    if R_MAX <= 0:
+        raw_target = n_max
+        target = raw_target
+    else:
+        raw_target = min(n_med, int(R_MAX * n_min))
+        target = max(MIN_TRAIN_TARGET, min(MAX_TRAIN_TARGET, raw_target))
 
     print("\n=== Penentuan Target Balanced TRAIN (ilmiah & reproducible) ===")
     print(f"Train counts per class : {counts}")
     print(f"n_min (kelas paling sedikit)      = {n_min}")
+    print(f"n_max (kelas paling banyak)       = {n_max}")
     print(f"median(n_k) (ukuran 'wajar')      = {n_med}")
     print(f"R_MAX (cap augment multiplier)    = {R_MAX}")
-    print(f"raw_target = min({n_med}, {R_MAX}*{n_min}) = {raw_target}")
-    if target != raw_target:
-        print(f"clamp => final_target = {target} (dibatasi MIN/MAX)")
-    else:
+
+    if R_MAX <= 0:
+        print("R_MAX <= 0 => auto target mengikuti mayoritas class (seperti segmentasi).")
+        print(f"raw_target = n_max = {raw_target}")
         print(f"final_target = {target}")
+    else:
+        print(f"raw_target = min({n_med}, {R_MAX}*{n_min}) = {raw_target}")
+        if target != raw_target:
+            print(f"clamp => final_target = {target} (dibatasi MIN/MAX)")
+        else:
+            print(f"final_target = {target}")
     print("=============================================================\n")
 
     return target
@@ -139,6 +161,7 @@ def process_train_with_augment():
         return
 
     print(f"\n=== Processing {split.upper()} split (AUGMENT & BALANCE) ===")
+    print("Catatan: hanya TRAIN yang diproses. VAL dan TEST dibiarkan asli untuk evaluasi objektif.")
     safe_reset_dir(target_dir)
 
     class_dirs = list_dirs(source_dir)
@@ -170,24 +193,33 @@ def process_train_with_augment():
             except Exception:
                 pass
 
+        # Downsample jika melebihi target
         if current_count > target_count:
             chosen = deterministic_sample(image_files, target_count, class_name, base_seed=GLOBAL_SEED)
             for img_name in tqdm(chosen, desc=f"Copy {class_name}", ncols=80):
-                copy_file(os.path.join(class_path, img_name),
-                          os.path.join(target_class_path, img_name))
+                copy_file(
+                    os.path.join(class_path, img_name),
+                    os.path.join(target_class_path, img_name)
+                )
             continue
 
+        # Copy semua data asli terlebih dahulu
         for img_name in tqdm(image_files, desc=f"Copy {class_name}", ncols=80):
-            copy_file(os.path.join(class_path, img_name),
-                      os.path.join(target_class_path, img_name))
+            copy_file(
+                os.path.join(class_path, img_name),
+                os.path.join(target_class_path, img_name)
+            )
 
+        # Augment jika jumlah masih kurang dari target
         if current_count < target_count:
             needed = target_count - current_count
             augmented = 0
             skipped_dup = 0
             print(f"   Augmenting {class_name}: butuh {needed} tambahan...")
 
-            base_list = deterministic_sample(image_files, len(image_files), class_name, base_seed=GLOBAL_SEED)
+            base_list = deterministic_sample(
+                image_files, len(image_files), class_name, base_seed=GLOBAL_SEED
+            )
             i = 0
 
             while augmented < needed:
@@ -201,10 +233,12 @@ def process_train_with_augment():
                 tries = 0
                 saved = False
                 while tries < MAX_TRIES_PER_AUG and not saved:
-                    dyn_seed = (GLOBAL_SEED
-                                + (sum(map(ord, class_name)) * 100000)
-                                + (augmented * 9973)
-                                + tries)
+                    dyn_seed = (
+                        GLOBAL_SEED
+                        + (sum(map(ord, class_name)) * 100000)
+                        + (augmented * 9973)
+                        + tries
+                    )
 
                     for batch in augmentor_train.flow(img_array, batch_size=1, seed=dyn_seed):
                         aug_img = Image.fromarray(batch[0].astype("uint8"))
@@ -231,18 +265,23 @@ def process_train_with_augment():
                     img.save(os.path.join(target_class_path, aug_name), quality=95)
                     augmented += 1
 
-            print(f"Done augment '{class_name}': augmented={augmented}, skipped_dup={skipped_dup}, MAX_TRIES={MAX_TRIES_PER_AUG}")
+            print(
+                f"Done augment '{class_name}': "
+                f"augmented={augmented}, skipped_dup={skipped_dup}, MAX_TRIES={MAX_TRIES_PER_AUG}"
+            )
 
     print(f"\nSplit 'train' selesai di-balance dan disimpan di '{target_dir}'.")
-    print_class_summary(target_dir, "train")
+    print_class_summary(target_dir, "train_balanced")
 
 def augment_and_balance_dataset(split):
     if split == "train":
         process_train_with_augment()
+    elif split in {"val", "test"}:
+        print(f"[INFO] Split '{split}' sengaja tidak diproses. Evaluasi harus memakai data asli.")
     else:
         print(f"[SKIP] Split '{split}' tidak dikenali.")
 
 if __name__ == "__main__":
-    for split in ["train", "val"]:
-        augment_and_balance_dataset(split)
+    print_split_overview()
+    augment_and_balance_dataset("train")
     print("\nSemua proses selesai.")

@@ -1,0 +1,32 @@
+{
+  "cmd": "train",
+  "backbone": "alexnet",
+  "img_size": [
+    224,
+    224
+  ],
+  "train_dir": "datasets/processed/classification_dataset\\train_balanced",
+  "val_dir": "datasets/processed/classification_dataset\\val",
+  "test_dir": "datasets/processed/classification_dataset\\test",
+  "batch_size": 16,
+  "epochs_phase1": 3,
+  "epochs_phase2": 45,
+  "weights": "models/classification\\alexnet\\best_classification_model.weights.h5",
+  "class_indices": "models/classification\\alexnet\\classification_class_indices.json",
+  "best_tuned_cfg": {
+    "head": {
+      "head_type": "gap_gmp",
+      "dense_units": 512,
+      "drop1": 0.3,
+      "drop2": 0.4,
+      "dense_l2": 1e-05,
+      "dense_units2": 128,
+      "drop3": 0.3
+    },
+    "schedule": {
+      "lr_phase1": 0.0003,
+      "lr_phase2": 0.0001,
+      "unfreeze_last_n_layers": 60
+    }
+  }
+}

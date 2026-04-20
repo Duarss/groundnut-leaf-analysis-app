@@ -23,10 +23,61 @@ def list_images(d: Path):
 def k(sz: int):
     return cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (sz, sz))
 
+def count_split_pairs(root: Path, split: str):
+    img_dir = root / split / "images"
+    mask_dir = root / split / "masks"
+    if not img_dir.exists() or not mask_dir.exists():
+        return 0, 0, 0
+
+    imgs = list_images(img_dir)
+    n_img = len(imgs)
+
+    n_pair = 0
+    n_mask = 0
+    for mp in mask_dir.iterdir() if mask_dir.exists() else []:
+        if mp.is_file() and mp.suffix.lower() in VALID_EXT:
+            n_mask += 1
+
+    for ip in imgs:
+        cand = None
+        for ext in VALID_EXT:
+            m = mask_dir / f"{ip.stem}{ext}"
+            if m.exists():
+                cand = m
+                break
+        if cand is not None:
+            n_pair += 1
+
+    return n_img, n_mask, n_pair
+
+def print_split_overview(root: Path):
+    print("\n=== Overview severity dataset splits ===")
+    for split in ["train", "val", "test"]:
+        n_img, n_mask, n_pair = count_split_pairs(root, split)
+        split_root = root / split
+        if not split_root.exists():
+            print(f"{split.upper():<5}: (folder tidak ditemukan)")
+        else:
+            print(
+                f"{split.upper():<5}: images={n_img:4d} | masks={n_mask:4d} | paired={n_pair:4d}"
+            )
+    print("Catatan: augmentasi hanya diterapkan pada TRAIN. VAL dan TEST dibiarkan asli.\n")
+
 
 # ============================================================
 # HAND / SKIN VETO
 # ============================================================
+
+def skin_mask_ycrcb(bgr: np.ndarray) -> np.ndarray:
+    ycrcb = cv2.cvtColor(bgr, cv2.COLOR_BGR2YCrCb)
+    Y, Cr, Cb = cv2.split(ycrcb)
+    m = (Cr >= 135) & (Cr <= 180) & (Cb >= 85) & (Cb <= 135) & (Y >= 40)
+    m = m.astype(np.uint8)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, k(5), iterations=1)
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, k(7), iterations=1)
+    return m
+
+
 def overlap_ratio(a01: np.ndarray, b01: np.ndarray) -> float:
     denom = float(a01.sum())
     if denom <= 0:
@@ -135,6 +186,7 @@ def build_amg(args):
     )
     return amg, device
 
+
 # ============================================================
 # AUGMENTATION (TRAIN ONLY)
 # ============================================================
@@ -148,11 +200,18 @@ def augment_train_split(root: Path):
 
     imgs = list_images(train_img)
     print(f"[AUGMENT] Found {len(imgs)} training samples")
+    print("[AUGMENT] Hanya split TRAIN yang diproses. VAL dan TEST tetap asli.")
 
     added = 0
     for ip in tqdm(imgs, desc="Augmenting train") if tqdm else imgs:
-        mp = train_mask / f"{ip.stem}.png"
-        if not mp.exists():
+        mp = None
+        for ext in VALID_EXT:
+            cand = train_mask / f"{ip.stem}{ext}"
+            if cand.exists():
+                mp = cand
+                break
+
+        if mp is None:
             continue
 
         img = cv2.imread(str(ip))
@@ -160,15 +219,18 @@ def augment_train_split(root: Path):
         if img is None or mask is None:
             continue
 
+        # Horizontal flip
         cv2.imwrite(str(train_img / f"{ip.stem}_hflip{ip.suffix}"), cv2.flip(img, 1))
         cv2.imwrite(str(train_mask / f"{ip.stem}_hflip.png"), cv2.flip(mask, 1))
 
+        # Vertical flip
         cv2.imwrite(str(train_img / f"{ip.stem}_vflip{ip.suffix}"), cv2.flip(img, 0))
         cv2.imwrite(str(train_mask / f"{ip.stem}_vflip.png"), cv2.flip(mask, 0))
 
         added += 2
 
     print(f"[AUGMENT] Added {added} samples")
+    print("[AUGMENT] Validation dan testing split tidak diubah agar evaluasi tetap objektif.")
 
 
 # ============================================================
@@ -204,6 +266,8 @@ def main():
     args = ap.parse_args()
     root = Path(args.root)
 
+    print_split_overview(root)
+
     # MODE B: AUGMENT ONLY
     if args.augment_train:
         augment_train_split(root)
@@ -215,6 +279,7 @@ def main():
         raise SystemExit("--sam_ckpt is required unless --augment_train is used")
 
     print("Leaf GT generation with SAM is configured. (Pipeline unchanged)")
+    print("Catatan: struktur dataset sekarang dapat berupa train/val/test, tetapi preprocessing ini tetap train-only.")
 
 
 if __name__ == "__main__":

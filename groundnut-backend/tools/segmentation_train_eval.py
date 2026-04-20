@@ -99,24 +99,17 @@ def abbr_class_name(class_name: str) -> str:
         return "".join(t[0] for t in tokens).lower()
     return tokens[0][:3].lower()
 
-def short_tag(args) -> str:
-    return "global"
-
 def cfg_path(args) -> str:
-    return os.path.join(MODEL_DIR, f"best_{short_tag(args)}_tuned_cfg.json")
+    return os.path.join(MODEL_DIR, f"best_tuned_cfg.json")
 
 def trials_csv_path(args) -> str:
-    return os.path.join(MODEL_DIR, f"tune_{short_tag(args)}_{slug(args.search_method)}_trials.csv")
+    return os.path.join(MODEL_DIR, f"tune_{slug(args.search_method)}_trials.csv")
 
 def artifact_paths(args):
-    tag = short_tag(args)
-    weights = os.path.join(MODEL_DIR, f"best_{tag}_segmentation_model.weights.h5")
-    hist    = os.path.join(MODEL_DIR, f"best_{tag}_segmentation_model_hist.json")
-    spec    = os.path.join(MODEL_DIR, f"best_{tag}_segmentation_model_spec.json")
-    return weights, hist, spec, tag
-
-def res_root(args) -> str:
-    return os.path.join(RES_DIR, "global4")
+    weights = os.path.join(MODEL_DIR, f"best_segmentation_model.weights.h5")
+    hist    = os.path.join(MODEL_DIR, f"best_segmentation_model_hist.json")
+    spec    = os.path.join(MODEL_DIR, f"best_segmentation_model_spec.json")
+    return weights, hist, spec
 
 # =======================
 # CFG NORMALIZE / POLICY
@@ -165,7 +158,6 @@ def is_rosette_onlyclass(args) -> bool:
     return False
 
 def apply_rosette_policy(args, cfg: dict) -> dict:
-    # No special policies needed for global 4-class mode
     return cfg
 
 def set_dropout_globals(cfg: dict):
@@ -220,8 +212,11 @@ def plot_training_curves(history_dict, out_dir, prefix):
         plt.plot(epochs, history_dict.get(train_key, []), label=leg1)
         if val_key in history_dict:
             plt.plot(epochs, history_dict.get(val_key, []), label=leg2)
-        plt.xlabel("Epoch"); plt.ylabel(ylabel); plt.title(title)
-        plt.legend(); plt.tight_layout()
+        plt.xlabel("Epoch")
+        plt.ylabel(ylabel)
+        plt.title(title)
+        plt.legend()
+        plt.tight_layout()
         out_path = os.path.join(out_dir, filename)
         plt.savefig(out_path, dpi=200)
         plt.close()
@@ -546,7 +541,7 @@ def _select_indices_grouped_global4(pairs, n_pairs, seed):
         return groups, ["UNKNOWN"]
 
     base_quota = 1
-    remaining_budget = max(0, n_pairs - min(n_pairs, len(have)) )
+    remaining_budget = max(0, n_pairs - min(n_pairs, len(have)))
     extra_each = remaining_budget // max(1, len(have))
     extra_rem  = remaining_budget %  max(1, len(have))
 
@@ -600,15 +595,14 @@ def _select_indices_grouped_global4(pairs, n_pairs, seed):
     groups = {c: groups[c] for c in CLASS_NAMES if groups[c]}
     return groups, [c for c in CLASS_NAMES if c in groups]
 
-def save_val_overlay_grid(model, pairs, args, out_png: str, n_pairs: int = 12, 
-    thr: float = 0.5, seed: int = GLOBAL_SEED, cols: int = 4,):
+def save_val_overlay_grid(model, pairs, args, out_png: str, n_pairs: int = 12,
+                          thr: float = 0.5, seed: int = GLOBAL_SEED, cols: int = 4):
     os.makedirs(os.path.dirname(out_png) or ".", exist_ok=True)
 
     if len(pairs) == 0:
         print("[WARN] no pairs for overlay grid")
         return
 
-    rng = np.random.RandomState(seed)
     n_pairs = int(n_pairs)
     tiles = []
     class_headers = []
@@ -646,7 +640,6 @@ def save_val_overlay_grid(model, pairs, args, out_png: str, n_pairs: int = 12,
         print("[WARN] no tiles produced.")
         return []
 
-    # Slide-friendly output: 2x2 grid (4 tiles) per page.
     items_per_page = 4
     page_cols = 2
     page_rows = 2
@@ -715,65 +708,84 @@ def cm_report(tn: int, fp: int, fn: int, tp: int):
         "support_neg": int(tn + fp),
     }
 
-def plot_multiclass_confusion_matrix(cm: np.ndarray, class_names: list, out_path: str, 
+def save_eval_metrics_csv(rows: list, out_csv: str):
+    os.makedirs(os.path.dirname(out_csv) or ".", exist_ok=True)
+
+    fieldnames = [
+        "class_name",
+        "tn", "fp", "fn", "tp",
+        "precision", "recall", "f1", "accuracy", "specificity",
+        "iou", "dice",
+        "support_pos", "support_neg",
+    ]
+
+    with open(out_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for r in rows:
+            row = {}
+            for k in fieldnames:
+                v = r.get(k, "")
+                if isinstance(v, float):
+                    row[k] = f"{v:.6f}"
+                else:
+                    row[k] = v
+            w.writerow(row)
+
+    print(f"[OK] saved eval metrics csv -> {out_csv}")
+
+def plot_multiclass_confusion_matrix(cm: np.ndarray, class_names: list, out_path: str,
                                      title="Multi-Class Confusion Matrix", normalize=False):
     mat = cm.astype(np.float64)
     if normalize:
         row_sums = mat.sum(axis=1, keepdims=True)
         mat = mat / np.maximum(row_sums, 1e-12)
-    
+
     n_classes = len(class_names)
     fig, ax = plt.subplots(figsize=(10, 8))
-    
-    # Create heatmap
+
     im = ax.imshow(mat, interpolation='nearest', cmap='Blues', vmin=0)
-    
-    # Add colorbar
+
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label('Normalized Count' if normalize else 'Count', rotation=270, labelpad=20)
-    
-    # Set ticks and labels
+
     ax.set_xticks(range(n_classes))
     ax.set_yticks(range(n_classes))
     ax.set_xticklabels(class_names, rotation=45, ha="right")
     ax.set_yticklabels(class_names)
-    
-    # Add text annotations
-    thresh = mat.max() / 2.0
+
+    thresh = mat.max() / 2.0 if mat.size > 0 else 0.0
     for i in range(n_classes):
         for j in range(n_classes):
             val = mat[i, j]
             if normalize:
                 text = f"{val:.2f}"
             else:
-                # Format with K/M for large numbers
                 if val >= 1e6:
                     text = f"{val/1e6:.1f}M"
                 elif val >= 1e3:
                     text = f"{val/1e3:.1f}K"
                 else:
                     text = f"{int(val)}"
-            
+
             text_color = "white" if val > thresh else "black"
-            ax.text(j, i, text, ha="center", va="center", 
-                   color=text_color, fontsize=9, weight='bold')
-    
-    # Labels and title
+            ax.text(j, i, text, ha="center", va="center",
+                    color=text_color, fontsize=9, weight='bold')
+
     ax.set_ylabel('True Label', fontsize=12, weight='bold')
     ax.set_xlabel('Predicted Label', fontsize=12, weight='bold')
     ax.set_title(title, fontsize=14, weight='bold', pad=20)
-    
-    # Calculate and display overall accuracy
+
     total = cm.sum()
     correct = np.diag(cm).sum()
     accuracy = correct / max(total, 1)
-    
+
     metrics_text = f"Overall Pixel Accuracy: {accuracy:.4f} ({correct:,} / {int(total):,})"
     plt.figtext(0.5, 0.02, metrics_text, ha='center', fontsize=10, weight='bold',
                 bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.5))
-    
+
     plt.tight_layout(rect=[0, 0.05, 1, 1])
-    
+
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     plt.savefig(out_path, dpi=200, bbox_inches='tight')
     plt.close()
@@ -951,7 +963,7 @@ def train_mode(args):
     loss_fn = lambda yt, yp: total_loss(yt, yp, cfg)
     metrics = [DiceBin(0.5, "dice50"), IoUBin(0.5, "iou50")]
 
-    weights_path, hist_path, spec_path, tag = artifact_paths(args)
+    weights_path, hist_path, spec_path = artifact_paths(args)
 
     monitor = args.monitor_metric
     mode = "min" if monitor == "val_loss" else "max"
@@ -961,7 +973,6 @@ def train_mode(args):
     rlr  = ReduceLROnPlateau(monitor=monitor, mode=mode, factor=0.5, patience=args.lr_patience, min_lr=args.min_lr, verbose=1)
 
     print("\n[TRAIN_SETUP]")
-    print(f"  run            : GLOBAL4")
     print(f"  data_mode      : {info.get('mode')}")
     print(f"  input          : {args.img_h}x{args.img_w} | bs={args.batch_size}")
     print(f"  cfg            : {cfg}")
@@ -976,7 +987,7 @@ def train_mode(args):
     jsave(hist_path, hist_clean)
     print(f"[OK] saved history -> {hist_path}")
 
-    prefix = f"best_{tag}_segmentation_model"
+    prefix = f"best_segmentation_model"
     plot_training_curves(hist_clean, out_dir=MODEL_DIR, prefix=prefix)
 
     spec = {
@@ -987,6 +998,9 @@ def train_mode(args):
         "class_names": CLASS_NAMES,
         "selected_cfg": cfg,
         "cfg_source": args.cfg_json if args.cfg_json else cfg_path(args),
+        "train_split": args.train_roi_split,
+        "val_split": args.val_split,
+        "test_split": args.test_split,
         "monitor": {"metric": monitor, "mode": mode},
         "constraints": {"tv_w+bce_w": 1.0, "tv_alpha+tv_beta": 1.0},
         "paths": {
@@ -1001,25 +1015,6 @@ def train_mode(args):
     jsave(spec_path, spec)
     print(f"[OK] saved spec -> {spec_path}")
 
-    if args.save_overlays:
-        rr = res_root(args)
-        os.makedirs(rr, exist_ok=True)
-        folder_tag = safe_name(args.tag.strip() if args.tag.strip() else "GLOBAL4")
-        out_png = os.path.join(
-            rr,
-            f"{slug(folder_tag)}_train_overlay_grid_thr{args.overlay_thr:.2f}".replace(".", "p") + ".png"
-        )
-        save_val_overlay_grid(
-            model=model,
-            pairs=val_pairs,
-            args=args,
-            out_png=out_png,
-            n_pairs=args.overlay_n,
-            thr=args.overlay_thr,
-            seed=GLOBAL_SEED,
-            cols=args.overlay_cols
-        )
-
     cleanup(model, opt, ds_tr, ds_va)
 
 def eval_mode(args):
@@ -1029,12 +1024,12 @@ def eval_mode(args):
     cfg = apply_rosette_policy(args, cfg)
     set_dropout_globals(cfg)
 
-    val_root = os.path.join(BASE_DIR, args.val_split)
-    val_pairs = collect_pairs(val_root, args)
-    if len(val_pairs) == 0:
-        raise RuntimeError("Val pairs kosong. Cek val_split.")
+    test_root = os.path.join(BASE_DIR, args.test_split)
+    test_pairs = collect_pairs(test_root, args)
+    if len(test_pairs) == 0:
+        raise RuntimeError("Test pairs kosong. Cek test_split.")
 
-    ds = make_dataset(val_pairs, args, batch=int(args.batch_size), shuffle=False)
+    ds = make_dataset(test_pairs, args, batch=int(args.batch_size), shuffle=False)
 
     out_ch = len(CLASS_NAMES)
     model, _ = build_unet_effb0(args.img_h, args.img_w, out_channels=out_ch, train_encoder=False)
@@ -1050,54 +1045,52 @@ def eval_mode(args):
 
     out = model.evaluate(ds, verbose=1, return_dict=True)
     out_clean = {k: float(v) for k, v in out.items()}
-    print("[EVAL]", json.dumps(out_clean, indent=2))
+    print("[TEST_EVAL]", json.dumps(out_clean, indent=2))
 
-    rr = res_root(args)
-    os.makedirs(rr, exist_ok=True)
-    
     if args.cm_enable:
         thr_cm = float(args.cm_thr)
+        thr_tag = f"{thr_cm:.2f}".replace(".", "p")
         print(f"\n[CONFUSION_MATRIX] pixel-level @ thr={thr_cm:.3f}")
+
+        rr = RES_DIR
+        os.makedirs(rr, exist_ok=True)
 
         ys, ps = [], []
         for xb, yb in ds:
             pb = model.predict(xb, verbose=0)
             ys.append(yb.numpy())
             ps.append(pb)
+
         y_true = np.concatenate(ys, axis=0)
         y_prob = np.concatenate(ps, axis=0)
 
-        reports = []
-        # Build multi-class confusion matrix (5x5: Background + 4 disease classes)
-        # Convert predictions to class indices
-        y_true_flat = y_true.reshape(-1, len(CLASS_NAMES))  # (N_pixels, 4)
-        y_prob_flat = y_prob.reshape(-1, len(CLASS_NAMES))  # (N_pixels, 4)
-        
-        # Determine true and predicted classes
-        # Class 0 = Background (all channels < 0.5)
-        # Class 1-4 = Disease classes (argmax of channels that are >= threshold)
+        # =========================
+        # MULTI-CLASS PIXEL CM
+        # =========================
+        y_true_flat = y_true.reshape(-1, len(CLASS_NAMES))
+        y_prob_flat = y_prob.reshape(-1, len(CLASS_NAMES))
+
         y_true_class = np.zeros(y_true_flat.shape[0], dtype=np.int32)
         y_pred_class = np.zeros(y_prob_flat.shape[0], dtype=np.int32)
-        
-        # For true labels: if any channel is > 0.5, assign to that class (1-indexed), else background (0)
+
         true_max = np.max(y_true_flat, axis=1)
         true_has_lesion = true_max > 0.5
         y_true_class[true_has_lesion] = np.argmax(y_true_flat[true_has_lesion], axis=1) + 1
-        
-        # For predictions: if any channel is >= threshold, assign to that class, else background
+
         pred_max = np.max(y_prob_flat, axis=1)
         pred_has_lesion = pred_max >= thr_cm
         y_pred_class[pred_has_lesion] = np.argmax(y_prob_flat[pred_has_lesion], axis=1) + 1
-        
-        # Build 5x5 confusion matrix
-        n_classes = len(CLASS_NAMES) + 1  # +1 for background
+
+        n_classes = len(CLASS_NAMES) + 1
         cm_multi = np.zeros((n_classes, n_classes), dtype=np.int64)
         for true_c, pred_c in zip(y_true_class, y_pred_class):
             cm_multi[true_c, pred_c] += 1
-        
-        # Save normalized multi-class confusion matrix visualization
+
         all_class_names = ["Background"] + CLASS_NAMES
-        cm_multi_norm_png = os.path.join(rr, f"cm_multiclass_normalized_{Path(args.weights).stem}_thr{thr_cm:.2f}.png".replace(".", "p"))
+        cm_multi_norm_png = os.path.join(
+            rr,
+            f"cm_multiclass_normalized_{Path(args.weights).stem}_thr{thr_tag}.png"
+        )
         plot_multiclass_confusion_matrix(
             cm=cm_multi,
             class_names=all_class_names,
@@ -1105,21 +1098,64 @@ def eval_mode(args):
             title=f"Multi-Class Confusion Matrix - Normalized (thr={thr_cm:.2f})",
             normalize=True
         )
-        
-        # Calculate per-class metrics for reports (display only)
+
+        # =========================
+        # PER-CLASS METRICS + MACRO AVG
+        # =========================
+        reports = []
         for ci, cname in enumerate(CLASS_NAMES):
             tn, fp, fn, tp = pixel_confusion(y_true[..., ci], y_prob[..., ci], thr=thr_cm)
             rep = cm_report(tn, fp, fn, tp)
-            print(f"  {cname}: TP={tp} FP={fp} FN={fn} TN={tn} | P={rep['precision']:.4f} R={rep['recall']:.4f} F1={rep['f1']:.4f}")
+            rep["class_name"] = cname
+            reports.append(rep)
+
+            print(
+                f"  {cname}: "
+                f"TP={tp} FP={fp} FN={fn} TN={tn} | "
+                f"P={rep['precision']:.4f} R={rep['recall']:.4f} "
+                f"F1={rep['f1']:.4f} Acc={rep['accuracy']:.4f} "
+                f"Spec={rep['specificity']:.4f} IoU={rep['iou']:.4f} Dice={rep['dice']:.4f}"
+            )
+
+        macro = {
+            "class_name": "MACRO_AVG",
+            "tn": int(np.sum([r["tn"] for r in reports])),
+            "fp": int(np.sum([r["fp"] for r in reports])),
+            "fn": int(np.sum([r["fn"] for r in reports])),
+            "tp": int(np.sum([r["tp"] for r in reports])),
+            "precision": float(np.mean([r["precision"] for r in reports])) if reports else 0.0,
+            "recall": float(np.mean([r["recall"] for r in reports])) if reports else 0.0,
+            "f1": float(np.mean([r["f1"] for r in reports])) if reports else 0.0,
+            "accuracy": float(np.mean([r["accuracy"] for r in reports])) if reports else 0.0,
+            "specificity": float(np.mean([r["specificity"] for r in reports])) if reports else 0.0,
+            "iou": float(np.mean([r["iou"] for r in reports])) if reports else 0.0,
+            "dice": float(np.mean([r["dice"] for r in reports])) if reports else 0.0,
+            "support_pos": int(np.sum([r["support_pos"] for r in reports])),
+            "support_neg": int(np.sum([r["support_neg"] for r in reports])),
+        }
+
+        print(
+            f"\n  [MACRO_AVG] "
+            f"P={macro['precision']:.4f} R={macro['recall']:.4f} "
+            f"F1={macro['f1']:.4f} Acc={macro['accuracy']:.4f} "
+            f"Spec={macro['specificity']:.4f} IoU={macro['iou']:.4f} Dice={macro['dice']:.4f}"
+        )
+
+        metrics_csv = os.path.join(
+            rr,
+            f"eval_metrics_{Path(args.weights).stem}_thr{thr_tag}.csv"
+        )
+        save_eval_metrics_csv(reports + [macro], metrics_csv)
 
     if args.save_overlays:
+        thr_tag_overlay = f"{args.overlay_thr:.2f}".replace(".", "p")
         out_png = os.path.join(
-            rr,
-            f"eval_{Path(args.weights).stem}_overlay_grid_thr{args.overlay_thr:.2f}".replace(".", "p") + ".png"
+            RES_DIR,
+            f"eval_{Path(args.weights).stem}_overlay_grid_thr{thr_tag_overlay}.png"
         )
         save_val_overlay_grid(
             model=model,
-            pairs=val_pairs,
+            pairs=test_pairs,
             args=args,
             out_png=out_png,
             n_pairs=args.overlay_n,
@@ -1134,7 +1170,7 @@ def eval_mode(args):
 # CLI
 # =======================
 def parse_args():
-    p = argparse.ArgumentParser(description="Tune/Train/Eval U-Net EffNetB0 segmentation (simplified; outputs preserved)")
+    p = argparse.ArgumentParser(description="Tune/Train/Eval U-Net EffNetB0 segmentation (train uses val; final eval uses independent test split)")
     p.add_argument("--mode", choices=["tune", "train", "eval"], default="train")
 
     p.add_argument("--cfg_json", default="models/segmentation/best_tuned_cfg.json", help="Optional cfg json; if empty uses best_tuned_cfg.json")
@@ -1150,15 +1186,15 @@ def parse_args():
     p.add_argument("--monitor_metric", default="val_dice50", choices=["val_loss", "val_dice50", "val_iou50"])
 
     p.add_argument("--train_roi_split",  default="train_roi")
-    p.add_argument("--train_full_split", default="train_balanced_perclass")
+    p.add_argument("--train_full_split", default="train_balanced")
     p.add_argument("--val_split", default="val")
+    p.add_argument("--test_split", default="test")
 
-    p.add_argument("--weights", default="")
+    p.add_argument("--weights", default="models/segmentation/best_segmentation_model.weights.h5", help="Required for eval mode; ignored for tune/train")
     p.add_argument("--save_overlays", action="store_true")
     p.add_argument("--overlay_n", type=int, default=12, help="pairs sampled; tiles = 2*overlay_n")
     p.add_argument("--overlay_thr", type=float, default=0.50)
     p.add_argument("--overlay_cols", type=int, default=4)
-    p.add_argument("--tag", default="")
     p.add_argument("--cm_enable", action="store_true")
     p.add_argument("--cm_thr", type=float, default=0.50)
     p.add_argument("--freeze_bn", action="store_true")
@@ -1182,7 +1218,6 @@ def parse_args():
 
     args = p.parse_args()
     args.cfg_json = (args.cfg_json or "").strip()
-    args.tag = args.tag or ""
 
     if args.mode == "eval" and not args.weights:
         raise RuntimeError("--weights wajib untuk mode eval")

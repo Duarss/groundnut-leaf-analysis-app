@@ -1,33 +1,52 @@
 # tools/classification_train_eval.py
-# EfficientNetB4 Classification with Tune/Train/Eval (simplified structure)
+# Multi-backbone Classification with Tune/Train/Eval
+# EfficientNetB4 path preserved as main/default path
 import os, json, argparse, random, textwrap
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import tensorflow as tf
 
-from tensorflow.keras.applications.efficientnet import EfficientNetB4, preprocess_input
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import ( Dense, GlobalAveragePooling2D, GlobalMaxPooling2D,
-    Dropout, BatchNormalization, Concatenate )
+from tensorflow.keras.layers import (
+    Dense, GlobalAveragePooling2D, GlobalMaxPooling2D, Dropout,
+    BatchNormalization, Concatenate, Conv2D, MaxPooling2D, Flatten, Input
+)
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras import mixed_precision, backend as K
 
+# ==== Backbone imports ====
+from tensorflow.keras.applications.efficientnet import EfficientNetB4
+from tensorflow.keras.applications.efficientnet import preprocess_input as effnet_preprocess
+
+from tensorflow.keras.applications.inception_v3 import InceptionV3
+from tensorflow.keras.applications.inception_v3 import preprocess_input as inception_preprocess
+
+from tensorflow.keras.applications.resnet50 import ResNet50
+from tensorflow.keras.applications.resnet50 import preprocess_input as resnet_preprocess
+
+from tensorflow.keras.applications.densenet import DenseNet201
+from tensorflow.keras.applications.densenet import preprocess_input as densenet_preprocess
+
+
 BASE_DIR = "datasets/processed/classification_dataset"
 TRAIN_DIR = os.path.join(BASE_DIR, "train_balanced")
 VAL_DIR = os.path.join(BASE_DIR, "val")
+TEST_DIR = os.path.join(BASE_DIR, "test")
 MODEL_DIR = "models/classification"
 
-IMG_SIZE = (380, 380)
+IMG_SIZE = (380, 380)   # default EfficientNetB4
 NUM_CLASSES = 5
 BATCH = 16
 SEED = 42
 E1 = 3
 E2 = 45
 
+
+# ------------------ Runtime ------------------
 def setup_runtime(seed: int):
     mixed_precision.set_global_policy("mixed_float16")
     gpus = tf.config.experimental.list_physical_devices("GPU")
@@ -39,6 +58,60 @@ def setup_runtime(seed: int):
     random.seed(seed)
     np.random.seed(seed)
     tf.random.set_seed(seed)
+
+
+# ------------------ Backbone spec ------------------
+def get_backbone_spec(backbone_name: str) -> dict:
+    name = str(backbone_name).strip().lower()
+
+    if name == "efficientnetb4":
+        return {
+            "name": "efficientnetb4",
+            "img_size": (380, 380),
+            "preprocess_fn": effnet_preprocess,
+            "weights": "imagenet",
+            "pretty_name": "EfficientNetB4",
+        }
+    elif name == "inceptionv3":
+        return {
+            "name": "inceptionv3",
+            "img_size": (224, 224),
+            "preprocess_fn": inception_preprocess,
+            "weights": "imagenet",
+            "pretty_name": "InceptionV3",
+        }
+    elif name == "resnet50":
+        return {
+            "name": "resnet50",
+            "img_size": (224, 224),
+            "preprocess_fn": resnet_preprocess,
+            "weights": "imagenet",
+            "pretty_name": "ResNet50",
+        }
+    elif name == "densenet201":
+        return {
+            "name": "densenet201",
+            "img_size": (224, 224),
+            "preprocess_fn": densenet_preprocess,
+            "weights": "imagenet",
+            "pretty_name": "DenseNet201",
+        }
+    elif name == "alexnet":
+        # Custom AlexNet-like feature extractor, no pretrained ImageNet backbone
+        # Keep same experimental flow; only backbone differs.
+        return {
+            "name": "alexnet",
+            "img_size": (224, 224),
+            "preprocess_fn": None,  # use simple rescale 1./255
+            "weights": None,
+            "pretty_name": "AlexNet",
+        }
+    else:
+        raise ValueError(f"Unsupported backbone: {backbone_name}")
+
+
+def resolve_model_dir(base_model_dir: str, backbone_name: str) -> str:
+    return os.path.join(base_model_dir, str(backbone_name).lower())
 
 
 # ------------------ IO Helpers & Data ------------------
@@ -56,22 +129,52 @@ def load_class_indices(path: str):
     idx_to_class = {v: k for k, v in class_indices.items()}
     return class_indices, idx_to_class
 
-def make_gens(train_dir: str, val_dir: str, batch: int, seed: int):
-    train_gen = ImageDataGenerator(preprocessing_function=preprocess_input).flow_from_directory(
-        train_dir, target_size=IMG_SIZE, batch_size=batch, class_mode="categorical",
+
+def make_gens(train_dir: str, val_dir: str, batch: int, seed: int, backbone_name: str):
+    spec = get_backbone_spec(backbone_name)
+    img_size = spec["img_size"]
+    preprocess_fn = spec["preprocess_fn"]
+
+    if preprocess_fn is None:
+        train_idg = ImageDataGenerator(rescale=1.0 / 255.0)
+        val_idg = ImageDataGenerator(rescale=1.0 / 255.0)
+    else:
+        train_idg = ImageDataGenerator(preprocessing_function=preprocess_fn)
+        val_idg = ImageDataGenerator(preprocessing_function=preprocess_fn)
+
+    train_gen = train_idg.flow_from_directory(
+        train_dir, target_size=img_size, batch_size=batch, class_mode="categorical",
         shuffle=True, seed=seed
     )
-    val_gen = ImageDataGenerator(preprocessing_function=preprocess_input).flow_from_directory(
-        val_dir, target_size=IMG_SIZE, batch_size=batch, class_mode="categorical",
+    val_gen = val_idg.flow_from_directory(
+        val_dir, target_size=img_size, batch_size=batch, class_mode="categorical",
         shuffle=False, seed=seed
     )
     return train_gen, val_gen
+
+
+def make_eval_gen(eval_dir: str, batch: int, seed: int, backbone_name: str):
+    spec = get_backbone_spec(backbone_name)
+    img_size = spec["img_size"]
+    preprocess_fn = spec["preprocess_fn"]
+
+    if preprocess_fn is None:
+        idg = ImageDataGenerator(rescale=1.0 / 255.0)
+    else:
+        idg = ImageDataGenerator(preprocessing_function=preprocess_fn)
+
+    return idg.flow_from_directory(
+        eval_dir, target_size=img_size, batch_size=batch, class_mode="categorical",
+        shuffle=False, seed=seed
+    )
+
 
 # ------------------ Model ------------------
 def freeze_bn(model):
     for layer in model.layers:
         if isinstance(layer, BatchNormalization):
             layer.trainable = False
+
 
 def apply_head(x, head_cfg: dict, num_classes: int, activation="softmax", dtype_last="float32"):
     head_type = str(head_cfg["head_type"])
@@ -81,6 +184,8 @@ def apply_head(x, head_cfg: dict, num_classes: int, activation="softmax", dtype_
     dense_l2 = float(head_cfg.get("dense_l2", 0.0))
     reg = l2(dense_l2) if dense_l2 > 0 else None
 
+    # Preserve old behavior:
+    # "gap_gmp" uses concat GAP+GMP, others use GAP
     if head_type == "gap_gmp":
         gap = GlobalAveragePooling2D(name="gap")(x)
         gmp = GlobalMaxPooling2D(name="gmp")(x)
@@ -103,10 +208,63 @@ def apply_head(x, head_cfg: dict, num_classes: int, activation="softmax", dtype_
     out = Dense(num_classes, activation=activation, dtype=dtype_last, name="predictions")(x)
     return out
 
-def build_model(cfg: dict, num_classes: int, activation="softmax", dtype_last="float32"):
-    base = EfficientNetB4(weights="imagenet", include_top=False, input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
-    out = apply_head(base.output, cfg["head"], num_classes, activation=activation, dtype_last=dtype_last)
-    return Model(inputs=base.input, outputs=out, name="EffNetB4_Classifier"), base
+
+def build_alexnet_base(input_shape):
+    """
+    AlexNet-like feature extractor (no pretrained weights).
+    Keep feature extractor + custom head consistent with main pipeline.
+    """
+    inp = Input(shape=input_shape, name="alexnet_input")
+    x = Conv2D(96, kernel_size=11, strides=4, padding="same", activation="relu", name="alex_conv1")(inp)
+    x = MaxPooling2D(pool_size=3, strides=2, padding="same", name="alex_pool1")(x)
+
+    x = Conv2D(256, kernel_size=5, padding="same", activation="relu", name="alex_conv2")(x)
+    x = MaxPooling2D(pool_size=3, strides=2, padding="same", name="alex_pool2")(x)
+
+    x = Conv2D(384, kernel_size=3, padding="same", activation="relu", name="alex_conv3")(x)
+    x = Conv2D(384, kernel_size=3, padding="same", activation="relu", name="alex_conv4")(x)
+    x = Conv2D(256, kernel_size=3, padding="same", activation="relu", name="alex_conv5")(x)
+    x = MaxPooling2D(pool_size=3, strides=2, padding="same", name="alex_pool5")(x)
+
+    base = Model(inputs=inp, outputs=x, name="AlexNetBase")
+    return base
+
+
+def build_model(cfg: dict, num_classes: int, backbone_name="efficientnetb4",
+                activation="softmax", dtype_last="float32"):
+    spec = get_backbone_spec(backbone_name)
+    input_shape = (spec["img_size"][0], spec["img_size"][1], 3)
+    bname = spec["name"]
+
+    if bname == "efficientnetb4":
+        # Preserve original path
+        base = EfficientNetB4(weights="imagenet", include_top=False, input_shape=input_shape)
+        out = apply_head(base.output, cfg["head"], num_classes, activation=activation, dtype_last=dtype_last)
+        return Model(inputs=base.input, outputs=out, name="EffNetB4_Classifier"), base
+
+    elif bname == "inceptionv3":
+        base = InceptionV3(weights="imagenet", include_top=False, input_shape=input_shape)
+        out = apply_head(base.output, cfg["head"], num_classes, activation=activation, dtype_last=dtype_last)
+        return Model(inputs=base.input, outputs=out, name="InceptionV3_Classifier"), base
+
+    elif bname == "resnet50":
+        base = ResNet50(weights="imagenet", include_top=False, input_shape=input_shape)
+        out = apply_head(base.output, cfg["head"], num_classes, activation=activation, dtype_last=dtype_last)
+        return Model(inputs=base.input, outputs=out, name="ResNet50_Classifier"), base
+
+    elif bname == "densenet201":
+        base = DenseNet201(weights="imagenet", include_top=False, input_shape=input_shape)
+        out = apply_head(base.output, cfg["head"], num_classes, activation=activation, dtype_last=dtype_last)
+        return Model(inputs=base.input, outputs=out, name="DenseNet201_Classifier"), base
+
+    elif bname == "alexnet":
+        base = build_alexnet_base(input_shape=input_shape)
+        out = apply_head(base.output, cfg["head"], num_classes, activation=activation, dtype_last=dtype_last)
+        return Model(inputs=base.input, outputs=out, name="AlexNet_Classifier"), base
+
+    else:
+        raise ValueError(backbone_name)
+
 
 # ------------------ Metrics + Reports ------------------
 def confusion_and_report(true_idx, pred_idx, num_classes, idx_to_class=None):
@@ -118,7 +276,6 @@ def confusion_and_report(true_idx, pred_idx, num_classes, idx_to_class=None):
     support = cm.sum(axis=1).astype(np.int64)
     tp = np.diag(cm).astype(np.float64)
 
-    # Per-class metrics
     precision = tp / np.maximum(cm.sum(axis=0).astype(np.float64), eps)
     recall    = tp / np.maximum(cm.sum(axis=1).astype(np.float64), eps)
     f1        = 2 * precision * recall / np.maximum(precision + recall, eps)
@@ -148,6 +305,7 @@ def confusion_and_report(true_idx, pred_idx, num_classes, idx_to_class=None):
     }
     return cm, rep
 
+
 def save_report_csv(rep, idx_to_class, path):
     rows = []
     for i in range(len(rep["precision"])):
@@ -170,11 +328,13 @@ def save_report_csv(rep, idx_to_class, path):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     pd.DataFrame(rows).to_csv(path, index=False)
 
+
 def save_confusion_csv(cm, idx_to_class, path):
     labels = [idx_to_class[i] for i in range(cm.shape[0])] if idx_to_class else [str(i) for i in range(cm.shape[0])]
     df = pd.DataFrame(cm, index=[f"true_{l}" for l in labels], columns=[f"pred_{l}" for l in labels])
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     df.to_csv(path, index=True)
+
 
 def plot_confusion_png(cm, idx_to_class, out_png, normalize=False):
     labels = [idx_to_class[i] for i in range(cm.shape[0])] if idx_to_class else [str(i) for i in range(cm.shape[0])]
@@ -207,6 +367,7 @@ def plot_confusion_png(cm, idx_to_class, out_png, normalize=False):
     os.makedirs(os.path.dirname(out_png) or ".", exist_ok=True)
     plt.savefig(out_png, dpi=200)
     plt.close()
+
 
 def plot_training_curves(history: dict, out_dir: str, prefix="classification"):
     os.makedirs(out_dir, exist_ok=True)
@@ -255,6 +416,7 @@ def plot_training_curves(history: dict, out_dir: str, prefix="classification"):
         plt.savefig(out_path, dpi=200)
         plt.close()
 
+
 def save_history(history: dict, out_dir: str, prefix="classification"):
     os.makedirs(out_dir, exist_ok=True)
     safe = {}
@@ -270,15 +432,16 @@ def save_history(history: dict, out_dir: str, prefix="classification"):
         json.dump(safe, f, indent=2)
     pd.DataFrame(safe).to_csv(cpath, index=False)
 
+
 def save_true_vs_pred_grid(filepaths, y_true, y_pred, probs, idx_to_class, out_png,
-                           max_items=16, samples_per_class=None, seed=42):
+                           img_size, max_items=16, samples_per_class=None, seed=42):
     y_true = np.asarray(y_true, dtype=np.int64)
     y_pred = np.asarray(y_pred, dtype=np.int64)
     probs = np.asarray(probs)
     n = min(len(y_true), len(y_pred), probs.shape[0], len(filepaths))
     if n <= 0:
         print("No samples to plot for True vs Pred grid.")
-        return
+        return []
 
     y_true = y_true[:n]
     y_pred = y_pred[:n]
@@ -334,7 +497,6 @@ def save_true_vs_pred_grid(filepaths, y_true, y_pred, probs, idx_to_class, out_p
     if not ext:
         ext = ".png"
 
-    # One slide/page = 2x2 grid (4 images) for readability in presentations.
     items_per_page = 4
     cols, rows = 2, 2
     wrap_width = 24
@@ -356,14 +518,13 @@ def save_true_vs_pred_grid(filepaths, y_true, y_pred, probs, idx_to_class, out_p
             col = k % cols
             ax = axes[row, col]
 
-            img = tf.keras.utils.load_img(filepaths[idx], target_size=IMG_SIZE)
+            img = tf.keras.utils.load_img(filepaths[idx], target_size=img_size)
             ax.imshow(img)
             ax.axis("off")
 
             tname = idx_to_class[int(y_true[idx])] if idx_to_class else str(int(y_true[idx]))
             pname = idx_to_class[int(y_pred[idx])] if idx_to_class else str(int(y_pred[idx]))
 
-            # Keep full labels, but wrap to multiple lines for slide readability.
             t_wrapped = textwrap.fill(tname.replace("_", " "), width=wrap_width, break_long_words=False, break_on_hyphens=False)
             p_wrapped = textwrap.fill(pname.replace("_", " "), width=wrap_width, break_long_words=False, break_on_hyphens=False)
             is_correct = int(y_true[idx]) == int(y_pred[idx])
@@ -397,6 +558,7 @@ def save_true_vs_pred_grid(filepaths, y_true, y_pred, probs, idx_to_class, out_p
 
     return saved_pages
 
+
 # ------------------ Search (Tune) ------------------
 def cfg_key(cfg: dict):
     h, s = cfg["head"], cfg["schedule"]
@@ -406,6 +568,7 @@ def cfg_key(cfg: dict):
         int(h.get("dense_units2", 0)), float(h.get("drop3", 0.0)),
         float(s["lr_phase1"]), float(s["lr_phase2"]), int(s["unfreeze_last_n_layers"])
     )
+
 
 def build_domain(args) -> dict:
     return {
@@ -420,6 +583,7 @@ def build_domain(args) -> dict:
         "lr_phase2": args.lr2,
         "unfreeze_last_n_layers": args.unfreeze,
     }
+
 
 def sample_cfg(dom: dict, rng) -> dict:
     return {
@@ -439,29 +603,64 @@ def sample_cfg(dom: dict, rng) -> dict:
         }
     }
 
+
 def gen_candidates(dom: dict, method: str, trials: int, seed: int):
     if method == "random":
         rng = np.random.default_rng(seed)
         cands = [sample_cfg(dom, rng) for _ in range(int(trials))]
+    elif method == "grid":
+        # keep minimal compatibility; random is the main mode
+        import itertools
+        cands = []
+        for combo in itertools.product(
+            dom["head_type"], dom["dense_units"], dom["drop1"], dom["drop2"], dom["dense_l2"],
+            dom["dense_units2"], dom["drop3"], dom["lr_phase1"], dom["lr_phase2"], dom["unfreeze_last_n_layers"]
+        ):
+            cands.append({
+                "head": {
+                    "head_type": str(combo[0]),
+                    "dense_units": int(combo[1]),
+                    "drop1": float(combo[2]),
+                    "drop2": float(combo[3]),
+                    "dense_l2": float(combo[4]),
+                    "dense_units2": int(combo[5]),
+                    "drop3": float(combo[6]),
+                },
+                "schedule": {
+                    "lr_phase1": float(combo[7]),
+                    "lr_phase2": float(combo[8]),
+                    "unfreeze_last_n_layers": int(combo[9]),
+                }
+            })
+    else:
+        raise ValueError(method)
 
     uniq = {}
     for c in cands:
         uniq[cfg_key(c)] = c
     return list(uniq.values())
 
-def proxy_eval(train_gen, val_gen, cfg: dict, batch: int, p1: int, p2: int, patience: int):
+
+def proxy_eval(train_gen, val_gen, cfg: dict, batch: int, p1: int, p2: int, patience: int, backbone_name: str):
     K.clear_session()
 
-    model, base = build_model(cfg, num_classes=train_gen.num_classes)
+    model, base = build_model(cfg, num_classes=train_gen.num_classes, backbone_name=backbone_name)
     steps = int(np.ceil(train_gen.samples / batch))
     val_steps = int(np.ceil(val_gen.samples / val_gen.batch_size))
     loss_fn = tf.keras.losses.CategoricalCrossentropy()
 
+    # Phase 1: freeze backbone
     base.trainable = False
-    model.compile(optimizer=Adam(float(cfg["schedule"]["lr_phase1"]), clipnorm=1.0), loss=loss_fn, metrics=["accuracy"])
-    model.fit(train_gen, validation_data=val_gen, steps_per_epoch=steps, validation_steps=val_steps,
-              epochs=int(p1), verbose=0, workers=1, use_multiprocessing=False)
+    model.compile(
+        optimizer=Adam(float(cfg["schedule"]["lr_phase1"]), clipnorm=1.0),
+        loss=loss_fn, metrics=["accuracy"]
+    )
+    model.fit(
+        train_gen, validation_data=val_gen, steps_per_epoch=steps, validation_steps=val_steps,
+        epochs=int(p1), verbose=0, workers=1, use_multiprocessing=False
+    )
 
+    # Phase 2: unfreeze last N layers
     base.trainable = True
     unfreeze_last = int(cfg["schedule"]["unfreeze_last_n_layers"])
     freeze_until = max(0, len(base.layers) - unfreeze_last)
@@ -471,10 +670,15 @@ def proxy_eval(train_gen, val_gen, cfg: dict, batch: int, p1: int, p2: int, pati
         layer.trainable = True
     freeze_bn(base)
 
-    model.compile(optimizer=Adam(float(cfg["schedule"]["lr_phase2"]), clipnorm=1.0), loss=loss_fn, metrics=["accuracy"])
+    model.compile(
+        optimizer=Adam(float(cfg["schedule"]["lr_phase2"]), clipnorm=1.0),
+        loss=loss_fn, metrics=["accuracy"]
+    )
     es = EarlyStopping(monitor="val_loss", patience=int(patience), min_delta=1e-5, restore_best_weights=True, verbose=0)
-    hist = model.fit(train_gen, validation_data=val_gen, steps_per_epoch=steps, validation_steps=val_steps,
-                     epochs=int(p2), callbacks=[es], verbose=0, workers=1, use_multiprocessing=False)
+    hist = model.fit(
+        train_gen, validation_data=val_gen, steps_per_epoch=steps, validation_steps=val_steps,
+        epochs=int(p2), callbacks=[es], verbose=0, workers=1, use_multiprocessing=False
+    )
 
     h = hist.history
     best_vloss = float(np.min(h.get("val_loss", [np.inf])))
@@ -483,22 +687,31 @@ def proxy_eval(train_gen, val_gen, cfg: dict, batch: int, p1: int, p2: int, pati
     K.clear_session()
     return best_vloss, best_vacc
 
+
 def run_tune(args):
+    args.model_dir = resolve_model_dir(args.model_dir, args.backbone)
     os.makedirs(args.model_dir, exist_ok=True)
-    train_gen, val_gen = make_gens(args.train_dir, args.val_dir, args.batch_size, args.seed)
+
+    train_gen, val_gen = make_gens(args.train_dir, args.val_dir, args.batch_size, args.seed, args.backbone)
     class_idx_path = os.path.join(args.model_dir, "classification_class_indices.json")
     jsave(class_idx_path, train_gen.class_indices)
+
     dom = build_domain(args)
     cands = gen_candidates(dom, args.search_method, args.trials, args.seed)
 
-    print(f"\nTune candidates ({args.search_method}): {len(cands)}")
+    print(f"\nBackbone: {args.backbone}")
+    print(f"Tune candidates ({args.search_method}): {len(cands)}")
     if args.search_method == "grid" and len(cands) > 2000:
         print("[WARN] Grid sangat besar, pertimbangkan kecilkan domain list.")
 
     rows = []
     for i, cfg in enumerate(cands, start=1):
         print(f"  Trial {i}/{len(cands)} | head_type={cfg['head']['head_type']}")
-        vloss, vacc = proxy_eval(train_gen, val_gen, cfg, args.batch_size, args.proxy_phase1_epochs, args.proxy_phase2_epochs, args.proxy_patience)
+        vloss, vacc = proxy_eval(
+            train_gen, val_gen, cfg, args.batch_size,
+            args.proxy_phase1_epochs, args.proxy_phase2_epochs, args.proxy_patience,
+            args.backbone
+        )
         rows.append({
             **cfg["head"],
             **cfg["schedule"],
@@ -510,6 +723,7 @@ def run_tune(args):
     trials_csv = os.path.join(args.model_dir, "tune_cfg_cand_trials.csv")
     df.to_csv(trials_csv, index=False)
     best_row = df.iloc[0].to_dict()
+
     best_cfg = {
         "head": {
             "head_type": str(best_row["head_type"]),
@@ -529,8 +743,11 @@ def run_tune(args):
 
     best_cfg_path = os.path.join(args.model_dir, "best_tuned_cfg.json")
     jsave(best_cfg_path, best_cfg)
+
     tune_spec = {
         "cmd": "tune",
+        "backbone": args.backbone,
+        "img_size": list(get_backbone_spec(args.backbone)["img_size"]),
         "search_method": args.search_method,
         "trials": int(args.trials),
         "proxy": {
@@ -550,10 +767,13 @@ def run_tune(args):
     print(f"\nSaved trials -> {trials_csv}")
     print(f"Saved best cfg -> {best_cfg_path}")
 
+
 # ------------------ Train (final) ------------------
 def run_train(args):
+    args.model_dir = resolve_model_dir(args.model_dir, args.backbone)
     os.makedirs(args.model_dir, exist_ok=True)
-    train_gen, val_gen = make_gens(args.train_dir, args.val_dir, args.batch_size, args.seed)
+
+    train_gen, val_gen = make_gens(args.train_dir, args.val_dir, args.batch_size, args.seed, args.backbone)
     class_idx_path = os.path.join(args.model_dir, "classification_class_indices.json")
     if not os.path.exists(class_idx_path):
         jsave(class_idx_path, train_gen.class_indices)
@@ -565,12 +785,14 @@ def run_train(args):
         run_tune(args)
 
     cfg = jload(best_cfg_path)
-    model, base = build_model(cfg, num_classes=train_gen.num_classes)
+    model, base = build_model(cfg, num_classes=train_gen.num_classes, backbone_name=args.backbone)
+
     weights_path = os.path.join(args.model_dir, "best_classification_model.weights.h5")
     loss_fn = tf.keras.losses.CategoricalCrossentropy()
     steps = int(np.ceil(train_gen.samples / args.batch_size))
     ckpt = ModelCheckpoint(weights_path, monitor="val_loss", save_best_only=True, save_weights_only=True, verbose=1)
 
+    # Phase 1
     base.trainable = False
     model.compile(
         optimizer=Adam(float(cfg["schedule"]["lr_phase1"]), clipnorm=1.0),
@@ -579,13 +801,14 @@ def run_train(args):
     es1 = EarlyStopping(monitor="val_loss", patience=6, min_delta=1e-5, restore_best_weights=True, verbose=1)
     rl1 = ReduceLROnPlateau(monitor="val_loss", factor=0.7, patience=2, min_lr=1e-7, verbose=1)
 
-    print("=== Phase 1: Training top layers (base frozen) ===")
+    print(f"=== Phase 1: Training top layers (base frozen) | backbone={args.backbone} ===")
     h1 = model.fit(
         train_gen, validation_data=val_gen, steps_per_epoch=steps,
         epochs=args.epochs_phase1, callbacks=[ckpt, es1, rl1],
         workers=1, use_multiprocessing=False
     )
 
+    # Phase 2
     print("=== Phase 2: Fine-tuning last layers (BN frozen) ===")
     base.trainable = True
     unfreeze_last = int(cfg["schedule"]["unfreeze_last_n_layers"])
@@ -595,6 +818,7 @@ def run_train(args):
     for layer in base.layers[freeze_until:]:
         layer.trainable = True
     freeze_bn(base)
+
     model.compile(
         optimizer=Adam(float(cfg["schedule"]["lr_phase2"]), clipnorm=1.0),
         loss=loss_fn, metrics=["accuracy"]
@@ -617,9 +841,14 @@ def run_train(args):
 
     save_history(hist, args.model_dir, prefix="classification")
     plot_training_curves(hist, args.model_dir, prefix="classification")
+
     train_spec = {
         "cmd": "train",
-        "img_size": list(IMG_SIZE),
+        "backbone": args.backbone,
+        "img_size": list(get_backbone_spec(args.backbone)["img_size"]),
+        "train_dir": args.train_dir,
+        "val_dir": args.val_dir,
+        "test_dir": args.test_dir,
         "batch_size": int(args.batch_size),
         "epochs_phase1": int(args.epochs_phase1),
         "epochs_phase2": int(args.epochs_phase2),
@@ -631,9 +860,12 @@ def run_train(args):
     print(f"Saved weights -> {weights_path}")
     K.clear_session()
 
+
 # ------------------ Eval ------------------
 def run_eval(args):
+    args.model_dir = resolve_model_dir(args.model_dir, args.backbone)
     os.makedirs(args.model_dir, exist_ok=True)
+
     class_idx_path = os.path.join(args.model_dir, "classification_class_indices.json")
     idx_to_class = None
     if os.path.exists(class_idx_path):
@@ -643,17 +875,18 @@ def run_eval(args):
     if not os.path.exists(cfg_path):
         raise RuntimeError("best_tuned_cfg.json tidak ditemukan. Jalankan tune/train dulu.")
 
+    spec = get_backbone_spec(args.backbone)
+    img_size = spec["img_size"]
+
     cfg = jload(cfg_path)
     prev_policy = mixed_precision.global_policy()
     mixed_precision.set_global_policy("float32")
     try:
-        model, _ = build_model(cfg, num_classes=NUM_CLASSES, activation="softmax", dtype_last="float32")
+        model, _ = build_model(cfg, num_classes=NUM_CLASSES, backbone_name=args.backbone,
+                               activation="softmax", dtype_last="float32")
         model.load_weights(args.weights)
 
-        gen = ImageDataGenerator(preprocessing_function=preprocess_input).flow_from_directory(
-            args.val_dir, target_size=IMG_SIZE, batch_size=args.batch_size, class_mode="categorical",
-            shuffle=False, seed=args.seed
-        )
+        gen = make_eval_gen(args.test_dir, args.batch_size, args.seed, args.backbone)
         filepaths = list(getattr(gen, "filepaths", []))
         n_steps = int(np.ceil(gen.n / gen.batch_size))
         all_probs, all_labels = [], []
@@ -666,13 +899,14 @@ def run_eval(args):
         probs = np.concatenate(all_probs, axis=0)[:gen.n]
         labels = np.concatenate(all_labels, axis=0)[:gen.n]
         eps = 1e-12
-        val_loss = float((-np.sum(labels * np.log(np.clip(probs, eps, 1.0)), axis=1)).mean())
+        test_loss = float((-np.sum(labels * np.log(np.clip(probs, eps, 1.0)), axis=1)).mean())
         preds = probs.argmax(axis=1)
         true = labels.argmax(axis=1)
-        val_acc = float((preds == true).mean())
+        test_acc = float((preds == true).mean())
 
-        print(f"Val Loss: {val_loss:.4f}")
-        print(f"Val Accuracy: {val_acc:.4f}")
+        print(f"Backbone       : {args.backbone}")
+        print(f"Test Loss      : {test_loss:.4f}")
+        print(f"Test Accuracy  : {test_acc:.4f}")
 
         cm, rep = confusion_and_report(true, preds, probs.shape[1], idx_to_class)
 
@@ -684,6 +918,7 @@ def run_eval(args):
         save_confusion_csv(cm, idx_to_class, cm_csv)
         plot_confusion_png(cm, idx_to_class, f"{base}_confusion.png", normalize=False)
         plot_confusion_png(cm, idx_to_class, f"{base}_confusion_normalized.png", normalize=True)
+
         conf = np.max(probs, axis=1)
         rows = []
         for i in range(len(true)):
@@ -699,10 +934,12 @@ def run_eval(args):
             })
         pd.DataFrame(rows).to_csv(pred_csv, index=False)
 
+        grid_pages = []
         if filepaths and len(filepaths) >= len(true):
             grid_pages = save_true_vs_pred_grid(
                 filepaths=filepaths, y_true=true, y_pred=preds, probs=probs,
                 idx_to_class=idx_to_class, out_png=f"{base}_true_vs_pred_grid.png",
+                img_size=img_size,
                 max_items=int(args.grid_n), samples_per_class=args.grid_per_class, seed=args.seed
             )
 
@@ -721,34 +958,45 @@ def run_eval(args):
         mixed_precision.set_global_policy(prev_policy)
         K.clear_session()
 
+
 # ------------------ CLI ------------------
 def parse_args():
-    p = argparse.ArgumentParser(description="EfficientNetB4: tune/train/eval")
+    p = argparse.ArgumentParser(description="Multi-backbone classification: tune/train/eval")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def add_common(sp):
         sp.add_argument("--train_dir", default=TRAIN_DIR)
         sp.add_argument("--val_dir", default=VAL_DIR)
+        sp.add_argument("--test_dir", default=TEST_DIR)
         sp.add_argument("--model_dir", default=MODEL_DIR)
         sp.add_argument("--batch_size", type=int, default=BATCH)
         sp.add_argument("--seed", type=int, default=SEED)
 
-        # search domain (match code)
-        sp.add_argument("--head_type", nargs="+", default=["baseline", "gap", "gap_gmp", "swish", "mlp2"])
+        # NEW: backbone (default preserves original path)
+        sp.add_argument(
+            "--backbone",
+            choices=["efficientnetb4", "inceptionv3", "resnet50", "densenet201", "alexnet"],
+            default="efficientnetb4"
+        )
+
+        # Search domain: keep same head-only tuning across backbones for fairness
+        sp.add_argument("--head_type", nargs="+", default=["gap", "gap_gmp", "swish", "mlp2"])
         sp.add_argument("--dense_units", nargs="+", type=int, default=[256, 384, 512])
         sp.add_argument("--drop1", nargs="+", type=float, default=[0.2, 0.3, 0.4])
         sp.add_argument("--drop2", nargs="+", type=float, default=[0.2, 0.3, 0.4])
         sp.add_argument("--dense_l2", nargs="+", type=float, default=[0.0, 1e-5, 1e-4])
         sp.add_argument("--dense_units2", nargs="+", type=int, default=[128, 192, 256])
         sp.add_argument("--drop3", nargs="+", type=float, default=[0.2, 0.3])
+
+        # Training schedule still tuned equally across backbones
         sp.add_argument("--lr1", nargs="+", type=float, default=[1e-3, 5e-4, 3e-4])
         sp.add_argument("--lr2", nargs="+", type=float, default=[1e-4, 5e-5, 3e-5])
         sp.add_argument("--unfreeze", nargs="+", type=int, default=[20, 40, 60])
 
         sp.add_argument("--search_method", choices=["random", "grid"], default="random")
         sp.add_argument("--trials", type=int, default=30)
-        sp.add_argument("--proxy_phase1_epochs", type=int, default=2)
-        sp.add_argument("--proxy_phase2_epochs", type=int, default=4)
+        sp.add_argument("--proxy_phase1_epochs", type=int, default=3)
+        sp.add_argument("--proxy_phase2_epochs", type=int, default=12)
         sp.add_argument("--proxy_patience", type=int, default=2)
 
     t = sub.add_parser("tune")
@@ -761,16 +1009,31 @@ def parse_args():
     tr.add_argument("--epochs_phase2", type=int, default=E2)
 
     ev = sub.add_parser("eval")
-    ev.add_argument("--val_dir", default=VAL_DIR)
+    ev.add_argument("--backbone",
+                    choices=["efficientnetb4", "inceptionv3", "resnet50", "densenet201", "alexnet"],
+                    default="efficientnetb4")
+    ev.add_argument("--test_dir", default=TEST_DIR)
     ev.add_argument("--model_dir", default=MODEL_DIR)
     ev.add_argument("--batch_size", type=int, default=BATCH)
     ev.add_argument("--seed", type=int, default=SEED)
-    ev.add_argument("--weights", default=os.path.join(MODEL_DIR, "best_classification_model.weights.h5"))
-    ev.add_argument("--out_prefix", default=os.path.join(MODEL_DIR, "eval"))
+    # weights default stays relative to resolved model_dir backbone subfolder
+    ev.add_argument("--weights", default=None)
+    ev.add_argument("--out_prefix", default=None)
     ev.add_argument("--grid_n", type=int, default=16)
     ev.add_argument("--grid_per_class", type=int, default=None)
 
-    return p.parse_args()
+    args = p.parse_args()
+
+    # auto-resolve defaults for eval
+    if args.cmd == "eval":
+        resolved_model_dir = resolve_model_dir(args.model_dir, args.backbone)
+        if args.weights is None:
+            args.weights = os.path.join(resolved_model_dir, "best_classification_model.weights.h5")
+        if args.out_prefix is None:
+            args.out_prefix = os.path.join(resolved_model_dir, "eval_test")
+
+    return args
+
 
 def main():
     args = parse_args()
@@ -784,6 +1047,7 @@ def main():
         run_eval(args)
     else:
         raise ValueError(args.cmd)
+
 
 if __name__ == "__main__":
     main()

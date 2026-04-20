@@ -1,0 +1,32 @@
+{
+  "cmd": "train",
+  "backbone": "efficientnetb4",
+  "img_size": [
+    380,
+    380
+  ],
+  "train_dir": "datasets/processed/classification_dataset\\train_balanced",
+  "val_dir": "datasets/processed/classification_dataset\\val",
+  "test_dir": "datasets/processed/classification_dataset\\test",
+  "batch_size": 16,
+  "epochs_phase1": 3,
+  "epochs_phase2": 45,
+  "weights": "models/classification\\efficientnetb4\\best_classification_model.weights.h5",
+  "class_indices": "models/classification\\efficientnetb4\\classification_class_indices.json",
+  "best_tuned_cfg": {
+    "head": {
+      "head_type": "mlp2",
+      "dense_units": 256,
+      "drop1": 0.4,
+      "drop2": 0.2,
+      "dense_l2": 1e-05,
+      "dense_units2": 192,
+      "drop3": 0.2
+    },
+    "schedule": {
+      "lr_phase1": 0.0005,
+      "lr_phase2": 5e-05,
+      "unfreeze_last_n_layers": 60
+    }
+  }
+}

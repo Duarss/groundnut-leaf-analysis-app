@@ -31,10 +31,8 @@ DEFAULT_CLASS_WEIGHT_OVERRIDES = {
 # =========================
 # Helpers (filesystem)
 # =========================
-
 def ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
-
 
 def list_files(path: str, exts: Tuple[str, ...]) -> List[str]:
     if not os.path.exists(path):
@@ -46,7 +44,6 @@ def list_files(path: str, exts: Tuple[str, ...]) -> List[str]:
             out.append(fn)
     return out
 
-
 def list_classes(split_root: str) -> List[str]:
     if not os.path.exists(split_root):
         return []
@@ -57,7 +54,6 @@ def list_classes(split_root: str) -> List[str]:
             classes.append(d)
     return classes
 
-
 def find_mask(mask_dir: str, stem: str) -> Optional[str]:
     for ext in MASK_EXT:
         p = os.path.join(mask_dir, f"{stem}{ext}")
@@ -65,11 +61,42 @@ def find_mask(mask_dir: str, stem: str) -> Optional[str]:
             return p
     return None
 
+def count_pairs(split_root: str) -> Dict[str, int]:
+    counts = {}
+    for cls in list_classes(split_root):
+        img_dir = os.path.join(split_root, cls, "images")
+        mask_dir = os.path.join(split_root, cls, "masks")
+
+        imgs = list_files(img_dir, IMG_EXT)
+        n = 0
+        for fn in imgs:
+            stem = os.path.splitext(fn)[0]
+            if find_mask(mask_dir, stem):
+                n += 1
+        counts[cls] = n
+    return counts
+
+def print_split_summary(split_root: str, split_name: str) -> None:
+    if not os.path.exists(split_root):
+        print(f"\n{split_name.upper()} summary:")
+        print("  (folder tidak ditemukan)")
+        return
+
+    counts = count_pairs(split_root)
+    total = sum(counts.values())
+
+    print(f"\n{split_name.upper()} summary (paired total {total}):")
+    if not counts:
+        print("  (kosong)")
+        return
+
+    width = max(len(k) for k in counts)
+    for cls, n in counts.items():
+        print(f"  {cls:<{width}} : {n:5d}")
 
 # =========================
 # Orphans checks
 # =========================
-
 def _count_orphans(orphans_dir: str) -> Dict[str, int]:
     no_mask_dir = os.path.join(orphans_dir, "no_mask")
     no_image_dir = os.path.join(orphans_dir, "no_image")
@@ -92,11 +119,9 @@ def _count_orphans(orphans_dir: str) -> Dict[str, int]:
         "total": c_no_mask + c_no_image,
     }
 
-
 # =========================
 # Lesion statistics
 # =========================
-
 def mask_area_ratio(mask_path: str) -> float:
     m = Image.open(mask_path).convert("L")
     arr = np.asarray(m, dtype=np.uint8)
@@ -129,7 +154,6 @@ def bucket_by_quantile(r: float, q1v: float, q2v: float) -> str:
 # =========================
 # Weight profiles (STRICT)
 # =========================
-
 def load_weight_overrides(path: Optional[str]) -> Dict[str, Dict[str, float]]:
     if not path:
         return dict(DEFAULT_CLASS_WEIGHT_OVERRIDES)
@@ -147,7 +171,6 @@ def load_weight_overrides(path: Optional[str]) -> Dict[str, Dict[str, float]]:
         }
     return merged
 
-
 def assert_strict_weights(train_classes: List[str], weight_overrides: Dict[str, Dict[str, float]]) -> None:
     missing = [c for c in train_classes if c not in weight_overrides]
     if missing:
@@ -157,17 +180,14 @@ def assert_strict_weights(train_classes: List[str], weight_overrides: Dict[str, 
             "Tambahkan ke DEFAULT_CLASS_WEIGHT_OVERRIDES atau berikan --weight_override_json."
         )
 
-
 # =========================
 # Build datasets
 # =========================
-
 def _copy_pair(img_src: str, mask_src: str, img_dst: str, mask_dst: str) -> None:
     ensure_dir(os.path.dirname(img_dst))
     ensure_dir(os.path.dirname(mask_dst))
     shutil.copy2(img_src, img_dst)
     shutil.copy2(mask_src, mask_dst)
-
 
 def _augment_and_save_pair(img_src: str, mask_src: str, img_dst: str, mask_dst: str, rng: np.random.RandomState) -> None:
     ensure_dir(os.path.dirname(img_dst))
@@ -213,7 +233,6 @@ def _augment_and_save_pair(img_src: str, mask_src: str, img_dst: str, mask_dst: 
         b = float(rng.uniform(-0.06, 0.06))
         x = np.clip(x * c + b, 0.0, 1.0)
 
-    # save
     out_img = Image.fromarray(np.clip(x * 255.0, 0, 255).astype(np.uint8), mode="RGB")
     out_msk = Image.fromarray((y > 0).astype(np.uint8) * 255, mode="L")
 
@@ -239,14 +258,19 @@ def _sample_indices_weighted(buckets: Dict[str, List[int]], weights: Dict[str, f
     chosen = np.random.choice(len(population), size=k, replace=True, p=probs_np)
     return [population[i] for i in chosen.tolist()]
 
-def build_train_balanced_global(src_train_root: str, dst_root: str, cutoffs: Dict[str, float],
-    profiles: Dict[str, Dict[str, float]], global_r_max: float, overwrite: bool) -> None:
+def build_train_balanced(
+    src_train_root: str,
+    dst_root: str,
+    cutoffs: Dict[str, float],
+    profiles: Dict[str, Dict[str, float]],
+    global_r_max: float,
+    overwrite: bool
+) -> None:
     if os.path.exists(dst_root) and (not overwrite):
         print(f"[SKIP] dst already exists (no_overwrite): {dst_root}")
         return
 
     if os.path.exists(dst_root) and overwrite:
-        import shutil
         shutil.rmtree(dst_root)
     ensure_dir(dst_root)
 
@@ -285,7 +309,7 @@ def build_train_balanced_global(src_train_root: str, dst_root: str, cutoffs: Dic
             counts.append(len(pairs))
 
     if not class_pairs:
-        raise RuntimeError("Tidak ada pasangan image-mask valid di TRAIN untuk global build.")
+        raise RuntimeError("Tidak ada pasangan image-mask valid di TRAIN.")
 
     n_min = int(min(counts))
     n_max = int(max(counts))
@@ -295,6 +319,10 @@ def build_train_balanced_global(src_train_root: str, dst_root: str, cutoffs: Dic
         target = min(n_max, cap)
     else:
         target = n_max
+
+    print("\n=== Build train_balanced ===")
+    print(f"n_min={n_min} | n_max={n_max} | target={target}")
+    print("Catatan: hanya TRAIN yang di-balance. VAL dan TEST dibiarkan asli.\n")
 
     for cls, pairs in class_pairs.items():
         dst_img_dir = os.path.join(dst_root, cls, "images")
@@ -307,7 +335,11 @@ def build_train_balanced_global(src_train_root: str, dst_root: str, cutoffs: Dic
             buckets[b].append(i)
 
         for ip, mp, _, __ in pairs:
-            _copy_pair(ip, mp, os.path.join(dst_img_dir, os.path.basename(ip)), os.path.join(dst_mask_dir, os.path.basename(mp)))
+            _copy_pair(
+                ip, mp,
+                os.path.join(dst_img_dir, os.path.basename(ip)),
+                os.path.join(dst_mask_dir, os.path.basename(mp))
+            )
 
         need = max(0, target - len(pairs))
         if need <= 0:
@@ -322,13 +354,11 @@ def build_train_balanced_global(src_train_root: str, dst_root: str, cutoffs: Dic
             mask_dst = os.path.join(dst_mask_dir, f"aug_{j:05d}_{base_mask}{os.path.splitext(mp)[1]}")
             _augment_and_save_pair(ip, mp, img_dst, mask_dst, rng)
 
-    print("[OK] train_balanced_global built:", dst_root)
-
+    print("[OK] train_balanced built:", dst_root)
 
 # =========================
 # Pipeline runner
 # =========================
-
 def run_pipeline(args: argparse.Namespace) -> None:
     random.seed(GLOBAL_SEED)
     np.random.seed(GLOBAL_SEED)
@@ -345,8 +375,15 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     src_train = os.path.join(args.src_base, args.train_split)
     src_val = os.path.join(args.src_base, args.val_split)
+    src_test = os.path.join(args.src_base, args.test_split)
 
-    dst_global = os.path.join(args.dest_base, "train_balanced_global")
+    print("\n=== Overview split dataset segmentasi area terinfeksi ===")
+    print_split_summary(src_train, args.train_split)
+    print_split_summary(src_val, args.val_split)
+    print_split_summary(src_test, args.test_split)
+    print("=========================================================\n")
+
+    dst_global = os.path.join(args.dest_base, "train_balanced")
 
     train_masks = []
     for cls in list_classes(src_train):
@@ -355,13 +392,12 @@ def run_pipeline(args: argparse.Namespace) -> None:
             train_masks.append(os.path.join(mask_dir, fn))
 
     cutoffs = compute_quantile_cutoffs(train_masks, args.q1, args.q2)
-    print(f"[INFO] quantile cutoffs (train masks): q1={cutoffs['q1']:.6f} q2={cutoffs['q2']:.6f}")
+    print(f"[INFO] quantile cutoffs (train masks only): q1={cutoffs['q1']:.6f} q2={cutoffs['q2']:.6f}")
 
     weight_overrides = load_weight_overrides(args.weight_override_json)
-
     overwrite = not bool(args.no_overwrite)
 
-    build_train_balanced_global(
+    build_train_balanced(
         src_train_root=src_train,
         dst_root=dst_global,
         cutoffs=cutoffs,
@@ -369,24 +405,23 @@ def run_pipeline(args: argparse.Namespace) -> None:
         global_r_max=float(args.global_r_max),
         overwrite=overwrite,
     )
-    print("\n[OK] Global balanced dataset ready:")
+
+    print("\n[OK] Balanced dataset ready:")
     print("  -", dst_global)
-
-    _ = src_val
-
+    print("[INFO] Validation dan testing split tidak diproses augmentasi/balancing agar evaluasi tetap objektif.")
 
 # =========================
 # CLI
 # =========================
-
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(
-        description="Segmentation preprocessing: build global balanced train set (STRICT weights). No JSON outputs."
+        description="Segmentation preprocessing: build balanced TRAIN set only. VAL/TEST untouched."
     )
 
     ap.add_argument("--src_base", default="datasets/processed/segmentation_dataset")
     ap.add_argument("--train_split", default="train")
     ap.add_argument("--val_split", default="val")
+    ap.add_argument("--test_split", default="test")
     ap.add_argument("--dest_base", default="datasets/processed/segmentation_dataset")
 
     ap.add_argument(
@@ -400,7 +435,6 @@ if __name__ == "__main__":
     ap.add_argument("--q2", type=float, default=Q2_DEFAULT)
 
     ap.add_argument("--weight_override_json", default=None)
-
     ap.add_argument("--no_overwrite", action="store_true")
 
     ap.add_argument(

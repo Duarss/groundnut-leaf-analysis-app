@@ -1,4 +1,3 @@
-# tools/dataset_split.py
 import sys
 import argparse
 import random
@@ -60,11 +59,23 @@ def split_list(items, ratio, rng: random.Random):
     rng.shuffle(items)
     n = len(items)
 
-    if len(ratio) == 2:
+    if len(ratio) == 3:
+        n_train = int(n * ratio[0])
+        n_val = int(n * ratio[1])
+
+        train = items[:n_train]
+        val = items[n_train:n_train + n_val]
+        test = items[n_train + n_val:]
+
+        return {"train": train, "val": val, "test": test}
+
+    elif len(ratio) == 2:
         n_train = int(n * ratio[0])
         train = items[:n_train]
         val = items[n_train:]
         return {"train": train, "val": val}
+
+    raise ValueError("Rasio harus terdiri dari 2 atau 3 angka.")
 
 # ======================== lesion size helpers =========================
 def mask_area_ratio(mask_path: Path) -> float:
@@ -106,7 +117,8 @@ def stratified_split_pairs_by_quantile(paired, ratio, rng, q1=0.33, q2=0.66, min
             "q2v": q2v
         }
 
-    parts = {k: [] for k in ("train", "val")}
+    split_keys = ("train", "val", "test") if len(ratio) == 3 else ("train", "val")
+    parts = {k: [] for k in split_keys}
     meta = {"mode": "stratified", "bucket_sizes": sizes, "q1v": q1v, "q2v": q2v}
 
     for bname, items in buckets.items():
@@ -131,7 +143,7 @@ def count_files_flat(class_dir: Path):
     return sum(1 for f in class_dir.iterdir() if f.is_file() and f.suffix.lower() in VALID_IMG_EXTS)
 
 def summarize_split(root: Path, min_val=8):
-    for split in ("train", "val"):
+    for split in ("train", "val", "test"):
         base = root / split
         if not base.exists():
             print(f"\n{split.upper()}: (tidak ada)")
@@ -148,7 +160,7 @@ def summarize_split(root: Path, min_val=8):
         print(f"\n{split.upper()} summary (total {total}):")
         for k, v in counts.items():
             warn = ""
-            if split == "val" and v < min_val:
+            if split in ("val", "test") and v < min_val:
                 warn = "< min_val_per_class"
             print(f"  {k:<{width}} : {v:5d}{warn}")
 
@@ -172,7 +184,7 @@ def parse_args():
     p.add_argument("--output", "-o", type=str, required=True,
                    help="Folder output hasil split (classification_dataset / segmentation_dataset / severity_dataset).")
     p.add_argument("--ratio", "-r", type=float, nargs="+",
-                   help="Rasio split. 2 angka untuk train,val. Contoh: -r 0.7 0.3")
+                   help="Rasio split. 3 angka untuk train,val,test. Contoh: -r 0.6 0.3 0.1")
     p.add_argument("--seed", type=int, default=42, help="Seed untuk reproducibility.")
     p.add_argument("--move", action="store_true",
                    help="Pindahkan file alih-alih menyalin (default: copy).")
@@ -181,14 +193,13 @@ def parse_args():
     p.add_argument("--healthy_names", type=str, nargs="*", default=["HEALTHY", "Healthy", "healthy"],
                    help="Nama folder kelas yang dianggap HEALTHY.")
     p.add_argument("--min_val_per_class", type=int, default=8,
-                   help="Peringatan jika jumlah per kelas di val < nilai ini (default: 8).")
+                   help="Peringatan jika jumlah per kelas di val/test < nilai ini (default: 8).")
     p.add_argument("--orphans_dir", type=str, default="orphans_report",
                    help="Folder untuk menyimpan laporan/penampungan data tanpa pasangan.")
 
     # ===== Stratified split (segmentation only) =====
     p.add_argument("--stratify_lesion", action="store_true",
                    help="Stratified split berdasarkan ukuran lesi per kelas.")
-
     p.add_argument("--stratify_mode", type=str, default="quantile", help="quantile (3 bucket berbasis quantile).")
 
     # quantile mode params
@@ -196,7 +207,6 @@ def parse_args():
                    help="(quantile mode) batas quantile pertama (default 0.33)")
     p.add_argument("--q2", type=float, default=0.66,
                    help="(quantile mode) batas quantile kedua (default 0.66)")
-
     p.add_argument("--min_bucket", type=int, default=6,
                    help="Minimal jumlah sample per bucket agar stratify jalan")
     return p.parse_args()
@@ -237,8 +247,8 @@ def split_classification(input_root: Path, output_root: Path, ratio, seed: int, 
 
     summarize_split(output_root)
 
-def split_segmentation(input_root: Path, output_root: Path, ratio, 
-    seed: int, move: bool, skip_healthy: bool, healthy_names, 
+def split_segmentation(input_root: Path, output_root: Path, ratio,
+    seed: int, move: bool, skip_healthy: bool, healthy_names,
     orphans_dir_name: str, stratify_lesion: bool, stratify_mode: str,
     q1: float, q2: float, min_bucket: int):
     rng = random.Random(seed)
@@ -255,9 +265,8 @@ def split_segmentation(input_root: Path, output_root: Path, ratio,
         raise RuntimeError(f"Tidak ada folder kelas di: {input_root}")
 
     print("\n=== MODE: SEGMENTATION (PAIRED) ===")
-    if stratify_lesion:
-        if stratify_mode == "quantile":
-            print(f"Stratified by lesion size (quantile): q1={q1}, q2={q2}, min_bucket={min_bucket}")
+    if stratify_lesion and stratify_mode == "quantile":
+        print(f"Stratified by lesion size (quantile): q1={q1}, q2={q2}, min_bucket={min_bucket}")
 
     for cls_dir in classes:
         cls = cls_dir.name
@@ -298,22 +307,22 @@ def split_segmentation(input_root: Path, output_root: Path, ratio,
             print(f"'{cls}' tidak punya pasangan image-mask yang valid.")
             continue
 
-        # ---- stratified split ----
-        if stratify_lesion:
-            if stratify_mode == "quantile":
-                parts, meta = stratified_split_pairs_by_quantile(
-                    paired=paired,
-                    ratio=ratio,
-                    rng=rng,
-                    q1=q1,
-                    q2=q2,
-                    min_bucket=min_bucket
-                )
-                if meta["mode"] == "stratified":
-                    bs = meta["bucket_sizes"]
-                    print(f"{cls}: quantile buckets \n"
-                        f"small={bs['small']}, mid={bs['mid']}, large={bs['large']} \n"
-                        f"| q1v={meta['q1v']:.6f} q2v={meta['q2v']:.6f}")
+        if stratify_lesion and stratify_mode == "quantile":
+            parts, meta = stratified_split_pairs_by_quantile(
+                paired=paired,
+                ratio=ratio,
+                rng=rng,
+                q1=q1,
+                q2=q2,
+                min_bucket=min_bucket
+            )
+            if meta["mode"] == "stratified":
+                bs = meta["bucket_sizes"]
+                print(f"{cls}: quantile buckets\n"
+                      f"small={bs['small']}, mid={bs['mid']}, large={bs['large']}\n"
+                      f"| q1v={meta['q1v']:.6f} q2v={meta['q2v']:.6f}")
+            else:
+                print(f"{cls}: fallback random split | bucket_sizes={meta['bucket_sizes']}")
         else:
             parts = split_list(paired, ratio, rng)
 
@@ -330,7 +339,28 @@ def split_segmentation(input_root: Path, output_root: Path, ratio,
         print(f"{cls}: paired_total={len(paired)} | " +
               " | ".join([f"{k}={len(v)}" for k, v in parts.items()]))
 
-    summarize_split(output_root)
+    print("\n=== SPLIT SUMMARY (SEGMENTATION) ===")
+    for split in ("train", "val", "test"):
+        base = output_root / split
+        if not base.exists():
+            print(f"\n{split.upper()}: (tidak ada)")
+            continue
+
+        classes = [d for d in sorted(base.iterdir()) if d.is_dir()]
+        if not classes:
+            print(f"\n{split.upper()}: (kosong)")
+            continue
+
+        counts = {d.name: count_pairs_seg(d) for d in classes}
+        total = sum(counts.values())
+        width = max((len(k) for k in counts), default=10)
+
+        print(f"\n{split.upper()} summary (total {total} pairs):")
+        for k, v in counts.items():
+            warn = ""
+            if split in ("val", "test") and v < 8:
+                warn = "< min_val_per_class"
+            print(f"  {k:<{width}} : {v:5d}{warn}")
 
     print(f"\nOrphans report disimpan di: {orphans_root}")
     print(f"   - no_mask  : image yang tidak punya pasangan mask")
@@ -352,7 +382,7 @@ def split_severity(input_root: Path, output_root: Path, ratio, seed: int, move: 
     if not pairs:
         raise RuntimeError("Tidak ada pasangan image-mask yang valid")
 
-    CLASS_NAMES = [ "HEALTHY", "ALTERNARIA LEAF SPOT", "LEAF SPOT (EARLY AND LATE)", "ROSETTE", "RUST" ]
+    CLASS_NAMES = ["HEALTHY", "ALTERNARIA LEAF SPOT", "LEAF SPOT (EARLY AND LATE)", "ROSETTE", "RUST"]
 
     _tr = str.maketrans({ch: " " for ch in "_-.,;:+|/"})
 
@@ -361,9 +391,9 @@ def split_severity(input_root: Path, output_root: Path, ratio, seed: int, move: 
 
     norm_classes = sorted(((c, _norm(c)) for c in CLASS_NAMES), key=lambda x: len(x[1]), reverse=True)
 
-    def get_class_from_name(p: Path) -> str | None:
+    def get_class_from_name(p: Path):
         name = _norm(p.stem)
-        best = None  # (orig, nlen)
+        best = None
         for orig, nc in norm_classes:
             if nc in name:
                 nlen = len(nc)
@@ -399,25 +429,33 @@ def split_severity(input_root: Path, output_root: Path, ratio, seed: int, move: 
             f"Pastikan nama file mengandung salah satu kelas: {CLASS_NAMES}"
         )
 
-    if len(ratio) != 2:
-        raise RuntimeError("Rasio harus 2 angka (train,val).")
+    if len(ratio) != 3:
+        raise RuntimeError("Severity split harus menggunakan 3 angka rasio: train,val,test.")
 
-    expected_each = 20
     per_cls_n = {c: len(by_class[c]) for c in CLASS_NAMES}
-    bad = {c: n for c, n in per_cls_n.items() if n != expected_each}
-    if bad:
+    uniq_counts = set(per_cls_n.values())
+    if len(uniq_counts) != 1:
         raise RuntimeError(
-            "Jumlah pair per kelas tidak sesuai ekspektasi (harus 20 per kelas agar jadi 14/6).\n"
-            + "\n".join([f"  - {c}: {n}" for c, n in bad.items()])
+            "Jumlah pair per kelas severity harus seimbang untuk split per kelas yang konsisten.\n"
+            + "\n".join([f"  - {c}: {n}" for c, n in per_cls_n.items()])
         )
 
-    n_train = int(round(expected_each * float(ratio[0])))
-    n_train = max(0, min(expected_each, n_train))
-    cnt = {"train": n_train, "val": expected_each - n_train}
-    if cnt["train"] != 14 or cnt["val"] != 6:
-        raise RuntimeError(f"Rasio tidak menghasilkan 14/6 per kelas. Hasil: {cnt}")
+    expected_each = next(iter(uniq_counts))
+    if expected_each <= 0:
+        raise RuntimeError("Jumlah pair per kelas tidak valid.")
 
-    parts = {"train": [], "val": []}
+    n_train = int(expected_each * float(ratio[0]))
+    n_val = int(expected_each * float(ratio[1]))
+    n_test = expected_each - (n_train + n_val)
+
+    if n_train <= 0 or n_val <= 0 or n_test <= 0:
+        raise RuntimeError(
+            f"Rasio menghasilkan split tidak valid per kelas: "
+            f"train={n_train}, val={n_val}, test={n_test}"
+        )
+
+    cnt = {"train": n_train, "val": n_val, "test": n_test}
+    parts = {"train": [], "val": [], "test": []}
     report = {}
 
     for cls in CLASS_NAMES:
@@ -425,10 +463,14 @@ def split_severity(input_root: Path, output_root: Path, ratio, seed: int, move: 
         rng.shuffle(items)
 
         tr = items[:cnt["train"]]
-        va = items[cnt["train"]:]
+        va = items[cnt["train"]:cnt["train"] + cnt["val"]]
+        te = items[cnt["train"] + cnt["val"]:]
+
         parts["train"].extend([(cls, img, msk) for img, msk in tr])
         parts["val"].extend([(cls, img, msk) for img, msk in va])
-        report[cls] = {"train": len(tr), "val": len(va)}
+        parts["test"].extend([(cls, img, msk) for img, msk in te])
+
+        report[cls] = {"train": len(tr), "val": len(va), "test": len(te)}
 
     safe_reset_dir(output_root)
 
@@ -436,7 +478,10 @@ def split_severity(input_root: Path, output_root: Path, ratio, seed: int, move: 
     print(f"Total paired samples : {len(pairs)}")
     for cls in CLASS_NAMES:
         rep = report[cls]
-        print(f"  - {cls}: total={len(by_class[cls])} | train={rep['train']} | val={rep['val']}")
+        print(
+            f"  - {cls}: total={len(by_class[cls])} | "
+            f"train={rep['train']} | val={rep['val']} | test={rep['test']}"
+        )
 
     for split_name, items in parts.items():
         out_img = output_root / split_name / "images"
@@ -459,7 +504,7 @@ def main():
     if not args.input:
         title = "Pilih folder dataset (cleaned_ori_dataset)"
         if args.task == "severity":
-            title = "Pilih ROOT dataset (5 kelas; masing-masing punya images/ dan masks/ lesion GT)"
+            title = "Pilih ROOT dataset severity (layout flat: images/ dan masks/)"
         input_folder = folder_picker(title=title)
     else:
         input_folder = args.input
@@ -474,12 +519,12 @@ def main():
         sys.exit(1)
 
     if not args.ratio:
-        ratio = (0.7, 0.3)
+        ratio = (0.6, 0.3, 0.1)
     else:
         ratio = tuple(args.ratio)
 
-    if len(ratio) not in (2):
-        print("Rasio harus 2 angka (train,val).")
+    if len(ratio) not in (2, 3):
+        print("Rasio harus 2 atau 3 angka (train,val[,test]).")
         sys.exit(1)
 
     if abs(sum(ratio) - 1.0) > 1e-6:
@@ -489,7 +534,9 @@ def main():
     output_root = Path(args.output)
 
     print("=== Konfigurasi Split ===")
-    if len(ratio) == 2:
+    if len(ratio) == 3:
+        print(f"Rasio  : train={ratio[0]:.2f}, val={ratio[1]:.2f}, test={ratio[2]:.2f}")
+    elif len(ratio) == 2:
         print(f"Rasio  : train={ratio[0]:.2f}, val={ratio[1]:.2f}")
     print(f"Task   : {args.task}")
     print(f"Input  : {input_root}")
@@ -505,17 +552,37 @@ def main():
 
     try:
         if args.task == "classification":
-            split_classification(input_root=input_root, output_root=output_root, ratio=ratio, 
-                seed=args.seed, move=args.move)
+            split_classification(
+                input_root=input_root,
+                output_root=output_root,
+                ratio=ratio,
+                seed=args.seed,
+                move=args.move
+            )
         elif args.task == "segmentation":
-            split_segmentation(input_root=input_root, output_root=output_root, ratio=ratio,
-                seed=args.seed, move=False, skip_healthy=args.skip_healthy_for_seg, 
-                healthy_names=args.healthy_names, orphans_dir_name=args.orphans_dir,
-                stratify_lesion=args.stratify_lesion, stratify_mode=args.stratify_mode,
-                q1=args.q1, q2=args.q2, min_bucket=args.min_bucket)
+            split_segmentation(
+                input_root=input_root,
+                output_root=output_root,
+                ratio=ratio,
+                seed=args.seed,
+                move=False,
+                skip_healthy=args.skip_healthy_for_seg,
+                healthy_names=args.healthy_names,
+                orphans_dir_name=args.orphans_dir,
+                stratify_lesion=args.stratify_lesion,
+                stratify_mode=args.stratify_mode,
+                q1=args.q1,
+                q2=args.q2,
+                min_bucket=args.min_bucket
+            )
         elif args.task == "severity":
-            split_severity(input_root=input_root, output_root=output_root, ratio=ratio,
-                seed=args.seed, move=args.move)
+            split_severity(
+                input_root=input_root,
+                output_root=output_root,
+                ratio=ratio,
+                seed=args.seed,
+                move=args.move
+            )
 
     except Exception as e:
         print(f"Error: {e}")

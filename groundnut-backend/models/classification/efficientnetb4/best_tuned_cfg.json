@@ -1,0 +1,16 @@
+{
+  "head": {
+    "head_type": "mlp2",
+    "dense_units": 256,
+    "drop1": 0.4,
+    "drop2": 0.2,
+    "dense_l2": 1e-05,
+    "dense_units2": 192,
+    "drop3": 0.2
+  },
+  "schedule": {
+    "lr_phase1": 0.0005,
+    "lr_phase2": 5e-05,
+    "unfreeze_last_n_layers": 60
+  }
+}

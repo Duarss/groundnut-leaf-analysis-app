@@ -36,12 +36,6 @@ def set_memory_growth():
     except Exception:
         pass
 
-def enable_mixed_precision(enable: bool):
-    try:
-        mixed_precision.set_global_policy("mixed_float16" if enable else "float32")
-    except Exception:
-        pass
-
 def ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
 
@@ -74,7 +68,7 @@ def save_json(obj, path: Path):
 def load_json(path: Path) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
-    
+
 def normalize_cfg(cfg: dict) -> dict:
     c = dict(cfg)
 
@@ -300,9 +294,16 @@ def compile_model(model, cfg):
     opt_name = cfg["optimizer"]
 
     if opt_name == "adamw":
-        opt = tf.keras.optimizers.AdamW(lr)
+        try:
+            opt = tf.keras.optimizers.AdamW(learning_rate=lr)
+        except AttributeError:
+            try:
+                opt = tf.keras.optimizers.experimental.AdamW(learning_rate=lr)
+            except AttributeError:
+                print("[WARN] AdamW tidak tersedia di versi TensorFlow ini. Fallback ke Adam.")
+                opt = tf.keras.optimizers.Adam(learning_rate=lr)
     else:
-        opt = tf.keras.optimizers.Adam(lr)
+        opt = tf.keras.optimizers.Adam(learning_rate=lr)
 
     model.compile(
         optimizer=opt,
@@ -386,6 +387,8 @@ def cm_metrics(tp, fp, fn, tn):
     f1 = safe_div(2 * precision * recall, precision + recall)
     acc = safe_div(tp + tn, tp + tn + fp + fn)
     specificity = safe_div(tn, tn + fp)
+    iou = safe_div(tp, tp + fp + fn)
+    dice = safe_div(2 * tp, 2 * tp + fp + fn)
     return {
         "tp": int(tp),
         "fp": int(fp),
@@ -396,40 +399,95 @@ def cm_metrics(tp, fp, fn, tn):
         "f1": float(f1),
         "accuracy": float(acc),
         "specificity": float(specificity),
+        "iou": float(iou),
+        "dice": float(dice),
+        "support_pos": int(tp + fn),
+        "support_neg": int(tn + fp),
     }
+
+def binary_class_reports_from_confusion(tp, fp, fn, tn):
+    # Positive class report: Leaf Mask
+    leaf = cm_metrics(tp, fp, fn, tn)
+    leaf["class_name"] = "Leaf Mask"
+
+    # Negative class report viewed as class target: Background
+    # Swap positive/negative perspective:
+    # TP_bg = TN, FP_bg = FN, FN_bg = FP, TN_bg = TP
+    bg = cm_metrics(tn, fn, fp, tp)
+    bg["class_name"] = "Background"
+
+    reports = [bg, leaf]
+
+    macro = {
+        "class_name": "MACRO_AVG",
+        "tn": int(np.sum([r["tn"] for r in reports])),
+        "fp": int(np.sum([r["fp"] for r in reports])),
+        "fn": int(np.sum([r["fn"] for r in reports])),
+        "tp": int(np.sum([r["tp"] for r in reports])),
+        "precision": float(np.mean([r["precision"] for r in reports])) if reports else 0.0,
+        "recall": float(np.mean([r["recall"] for r in reports])) if reports else 0.0,
+        "f1": float(np.mean([r["f1"] for r in reports])) if reports else 0.0,
+        "accuracy": float(np.mean([r["accuracy"] for r in reports])) if reports else 0.0,
+        "specificity": float(np.mean([r["specificity"] for r in reports])) if reports else 0.0,
+        "iou": float(np.mean([r["iou"] for r in reports])) if reports else 0.0,
+        "dice": float(np.mean([r["dice"] for r in reports])) if reports else 0.0,
+        "support_pos": int(np.sum([r["support_pos"] for r in reports])),
+        "support_neg": int(np.sum([r["support_neg"] for r in reports])),
+    }
+
+    return reports, macro
+
+def save_eval_metrics_csv(rows: list, out_csv: Path):
+    ensure_dir(out_csv.parent)
+
+    fieldnames = [
+        "class_name",
+        "tn", "fp", "fn", "tp",
+        "precision", "recall", "f1", "accuracy", "specificity",
+        "iou", "dice",
+        "support_pos", "support_neg",
+    ]
+
+    with open(out_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for r in rows:
+            row = {}
+            for k in fieldnames:
+                v = r.get(k, "")
+                if isinstance(v, float):
+                    row[k] = f"{v:.6f}"
+                else:
+                    row[k] = v
+            w.writerow(row)
+
+    print(f"[OK] saved eval metrics csv -> {out_csv}")
 
 def plot_confusion_matrix(tp, fp, fn, tn, out_path: Path, title="Confusion Matrix", class_names=None, normalize=False):
     if class_names is None:
         class_names = ("Background", "Leaf")
-    
-    # Build 2x2 matrix: [[TN, FP], [FN, TP]]
+
     cm = np.array([[tn, fp], [fn, tp]], dtype=np.int64)
     total = np.sum(cm)
     mat = cm.astype(np.float64)
     if normalize:
         row_sums = mat.sum(axis=1, keepdims=True)
         mat = mat / np.maximum(row_sums, 1e-12)
-    
-    # Create figure
+
     _, ax = plt.subplots(figsize=(8, 6))
-    
-    # Create heatmap
+
     im = ax.imshow(mat, interpolation='nearest', cmap='Blues', vmin=0)
-    
-    # Add colorbar
+
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label('Normalized Count' if normalize else 'Count', rotation=270, labelpad=20)
-    
-    # Set ticks and labels
+
     ax.set_xticks([0, 1])
     ax.set_yticks([0, 1])
     ax.set_xticklabels([f"Pred\n{class_names[0]}", f"Pred\n{class_names[1]}"])
     ax.set_yticklabels([f"True\n{class_names[0]}", f"True\n{class_names[1]}"])
-    
-    # Rotate the tick labels for better readability
+
     plt.setp(ax.get_xticklabels(), ha="center")
-    
-    # Add text annotations
+
     thresh = mat.max() / 2.0 if mat.size else 0.0
     for i in range(2):
         for j in range(2):
@@ -439,13 +497,11 @@ def plot_confusion_matrix(tp, fp, fn, tn, out_path: Path, title="Confusion Matri
             txt = f"{val:.2f}" if normalize else f"{count:,}\n({(count / max(total, 1) * 100.0):.1f}%)"
             ax.text(j, i, txt,
                    ha="center", va="center", color=text_color, fontsize=14, weight='bold')
-    
-    # Labels and title
+
     ax.set_ylabel('True Label', fontsize=12)
     ax.set_xlabel('Predicted Label', fontsize=12)
     ax.set_title(title, fontsize=14, weight='bold', pad=20)
-    
-    # Add metrics text below the matrix
+
     metrics = cm_metrics(tp, fp, fn, tn)
     metrics_text = (
         f"Accuracy: {metrics['accuracy']:.4f}  |  "
@@ -453,11 +509,11 @@ def plot_confusion_matrix(tp, fp, fn, tn, out_path: Path, title="Confusion Matri
         f"Recall: {metrics['recall']:.4f}  |  "
         f"F1: {metrics['f1']:.4f}"
     )
-    plt.figtext(0.5, 0.02, metrics_text, ha='center', fontsize=10, 
+    plt.figtext(0.5, 0.02, metrics_text, ha='center', fontsize=10,
                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
-    
+
     plt.tight_layout(rect=[0, 0.05, 1, 1])
-    
+
     ensure_dir(out_path.parent)
     plt.savefig(str(out_path), dpi=200, bbox_inches='tight')
     plt.close()
@@ -516,11 +572,10 @@ def _make_eval_tile(rgb_uint8: np.ndarray, gt01: np.ndarray, pr01: np.ndarray, t
     pr = _overlay_mask_rgb(rgb_uint8, pr01, color_rgb=(255, 0, 0), alpha=alpha)
     pr = _put_text(pr, f"PRED (red) | {title}")
 
-    # Keep only GT and PRED panels for cleaner comparison.
     return np.concatenate([gt, pr], axis=1)
 
 def save_overlay_grid_eval(val_pairs, model, out_path: Path, img_h: int, img_w: int,
-    thr: float, n: int = 25, cols: int = 5, alpha: float = 0.45, seed: int = 42,):
+    thr: float, n: int = 25, cols: int = 5, alpha: float = 0.45, seed: int = 42):
     if not val_pairs:
         print("[WARN] val_pairs kosong. Skip overlay grid.")
         return
@@ -594,7 +649,6 @@ def save_overlay_grid_eval(val_pairs, model, out_path: Path, img_h: int, img_w: 
         print("[WARN] Tidak ada tile. Skip overlay grid.")
         return
 
-    # Slide-friendly output: 2x2 grid (4 tiles) per page.
     items_per_page = 4
     page_cols = 2
     page_rows = 2
@@ -630,7 +684,8 @@ def save_overlay_grid_eval(val_pairs, model, out_path: Path, img_h: int, img_w: 
     dist = {c: 0 for c in LEAF_CLASSES_5}
     dist["UNKNOWN"] = 0
     for ip, _ in selected:
-        dist[infer_leaf_class_from_filename(ip)] = dist.get(infer_leaf_class_from_filename(ip), 0) + 1
+        cls_name = infer_leaf_class_from_filename(ip)
+        dist[cls_name] = dist.get(cls_name, 0) + 1
     print("[GRID_DIST]", dist)
     return saved_pages
 
@@ -718,7 +773,7 @@ def tune(args):
     best_val_loss = float("inf")
 
     log_path = out_dir / "severity_tuning_log.csv"
-    best_cfg_path = out_dir / "best_severity_config.json"
+    best_cfg_path = out_dir / "best_tuned_cfg.json"
     best_w_path = out_dir / "best_severity_model.weights.h5"
 
     fieldnames = [
@@ -856,11 +911,14 @@ def eval_model(args):
     cfg_path = Path(args.cfg_json) if args.cfg_json else (Path(MODEL_DIR) / "best_tuned_cfg.json")
     weights_path = Path(args.weights) if args.weights else (Path(MODEL_DIR) / "best_severity_model.weights.h5")
 
-    if not cfg_path.exists(): raise SystemExit(f"[ERROR] Config not found: {cfg_path}")
-    if not weights_path.exists(): raise SystemExit(f"[ERROR] Weights not found: {weights_path}")
+    if not cfg_path.exists():
+        raise SystemExit(f"[ERROR] Config not found: {cfg_path}")
+    if not weights_path.exists():
+        raise SystemExit(f"[ERROR] Weights not found: {weights_path}")
 
-    val_pairs = build_pairs(Path(args.data_root) / "val" / "images", Path(args.data_root) / "val" / "masks")
-    if not val_pairs: raise SystemExit("[ERROR] val pairs not found. Check dataset path.")
+    test_pairs = build_pairs(Path(args.data_root) / args.test_split / "images", Path(args.data_root) / args.test_split / "masks")
+    if not test_pairs:
+        raise SystemExit("[ERROR] test pairs not found. Check dataset path.")
 
     tf.keras.backend.clear_session()
     gc.collect()
@@ -876,14 +934,14 @@ def eval_model(args):
     ensure_dir(eval_dir)
     ensure_dir(pred_mask_dir)
     ensure_dir(masked_dir)
-    
+
     dice_m = DiceBin(threshold=args.threshold, name="dice50")
     iou_m  = IoUBin(threshold=args.threshold, name="iou50")
     loss_sum, loss_cnt = 0.0, 0
     agg_tp = agg_fp = agg_fn = agg_tn = 0
     per_image_rows = []
 
-    for img_path, mask_path in tqdm(val_pairs, desc="EVAL", ncols=140):
+    for img_path, mask_path in tqdm(test_pairs, desc="TEST_EVAL", ncols=140):
         bgr0 = cv2.imread(img_path)
         if bgr0 is None:
             continue
@@ -894,10 +952,12 @@ def eval_model(args):
         pred255 = (prob > args.threshold).astype(np.uint8) * 255
         stem = Path(img_path).stem
         cv2.imwrite(str(pred_mask_dir / f"{stem}.png"), pred255)
+
         m01 = (pred255 > 0).astype(np.uint8)
         pred_back = cv2.resize(m01, (bgr0.shape[1], bgr0.shape[0]), interpolation=cv2.INTER_NEAREST)
         masked = bgr0 * pred_back[:, :, None]
         cv2.imwrite(str(masked_dir / f"{stem}.jpg"), masked)
+
         gt0 = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         dice_i = iou_i = ""
         tp = fp = fn = tn = ""
@@ -906,6 +966,7 @@ def eval_model(args):
             gt = cv2.resize(gt0, (args.img_w, args.img_h), interpolation=cv2.INTER_NEAREST)
             gt_bin = (gt > 0).astype(np.float32)
             pr_bin = (prob > args.threshold).astype(np.float32)
+
             yt = tf.convert_to_tensor(gt_bin[None, ..., None], dtype=tf.float32)
             yp = tf.convert_to_tensor(prob[None, ..., None], dtype=tf.float32)
             li = composite_loss(
@@ -916,11 +977,14 @@ def eval_model(args):
             )
             loss_sum += float(li.numpy())
             loss_cnt += 1
+
             dice_m.update_state(gt_bin[None, ..., None], pr_bin[None, ..., None])
             iou_m.update_state(gt_bin[None, ..., None], pr_bin[None, ..., None])
+
             inter = float((gt_bin * pr_bin).sum())
             denom = float(gt_bin.sum() + pr_bin.sum())
             dice_i = (2.0 * inter + 1.0) / (denom + 1.0 + 1e-9)
+
             union = float(((gt_bin + pr_bin) > 0).sum())
             iou_i = (inter + 1.0) / (union + 1.0 + 1e-9)
 
@@ -932,8 +996,11 @@ def eval_model(args):
                 agg_fp += fp
                 agg_fn += fn
                 agg_tn += tn
+
         row = {
-            "filename": Path(img_path).name, "dice": float(dice_i) if dice_i != "" else "", "iou":  float(iou_i)  if iou_i  != "" else "",
+            "filename": Path(img_path).name,
+            "dice": float(dice_i) if dice_i != "" else "",
+            "iou":  float(iou_i) if iou_i != "" else "",
         }
         if args.cm_enable:
             row.update({"tp": tp, "fp": fp, "fn": fn, "tn": tn})
@@ -944,20 +1011,43 @@ def eval_model(args):
     avg_loss = float(loss_sum / max(loss_cnt, 1))
     weights_stem = weights_path.stem
     thr_tag = f"{float(args.threshold):.2f}".replace(".", "p")
+
     summary = {
-        "weights": str(weights_path), "cfg_path": str(cfg_path), "threshold": float(args.threshold), "loss": float(avg_loss),
-        "dice50": float(dice), "iou50": float(iou), "n_val": int(len(val_pairs)),
+        "weights": str(weights_path),
+        "cfg_path": str(cfg_path),
+        "threshold": float(args.threshold),
+        "loss": float(avg_loss),
+        "dice50": float(dice),
+        "iou50": float(iou),
+        "n_test": int(len(test_pairs)),
     }
+
+    # Optional per-image CSV
+    per_image_csv = eval_dir / f"eval_per_image_{weights_stem}_thr{thr_tag}.csv"
+    with open(per_image_csv, "w", newline="", encoding="utf-8") as f:
+        fieldnames = ["filename", "dice", "iou"] + (["tp", "fp", "fn", "tn"] if args.cm_enable else [])
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for row in per_image_rows:
+            w.writerow(row)
+    print("[OK] saved per-image csv:", per_image_csv)
 
     if args.cm_enable:
         cm_sum = cm_metrics(agg_tp, agg_fp, agg_fn, agg_tn)
         summary.update({
-            "cm_tp": cm_sum["tp"], "cm_fp": cm_sum["fp"], "cm_fn": cm_sum["fn"], "cm_tn": cm_sum["tn"],
-            "cm_precision": cm_sum["precision"], "cm_recall": cm_sum["recall"], "cm_f1": cm_sum["f1"],
-            "cm_accuracy": cm_sum["accuracy"], "cm_specificity": cm_sum["specificity"],
+            "cm_tp": cm_sum["tp"],
+            "cm_fp": cm_sum["fp"],
+            "cm_fn": cm_sum["fn"],
+            "cm_tn": cm_sum["tn"],
+            "cm_precision": cm_sum["precision"],
+            "cm_recall": cm_sum["recall"],
+            "cm_f1": cm_sum["f1"],
+            "cm_accuracy": cm_sum["accuracy"],
+            "cm_specificity": cm_sum["specificity"],
+            "cm_iou": cm_sum["iou"],
+            "cm_dice": cm_sum["dice"],
         })
-        
-        # Save confusion matrix visualization
+
         cm_png = eval_dir / f"eval_confusion_matrix_{weights_stem}_thr{thr_tag}.png"
         plot_confusion_matrix(
             tp=agg_tp, fp=agg_fp, fn=agg_fn, tn=agg_tn,
@@ -976,15 +1066,48 @@ def eval_model(args):
             normalize=True
         )
 
+        reports, macro = binary_class_reports_from_confusion(agg_tp, agg_fp, agg_fn, agg_tn)
+
+        print("\n[CM_METRICS_PER_CLASS]")
+        for rep in reports:
+            print(
+                f"  {rep['class_name']}: "
+                f"TP={rep['tp']} FP={rep['fp']} FN={rep['fn']} TN={rep['tn']} | "
+                f"P={rep['precision']:.4f} R={rep['recall']:.4f} "
+                f"F1={rep['f1']:.4f} Acc={rep['accuracy']:.4f} "
+                f"Spec={rep['specificity']:.4f} IoU={rep['iou']:.4f} Dice={rep['dice']:.4f}"
+            )
+
+        print(
+            f"\n  [MACRO_AVG] "
+            f"P={macro['precision']:.4f} R={macro['recall']:.4f} "
+            f"F1={macro['f1']:.4f} Acc={macro['accuracy']:.4f} "
+            f"Spec={macro['specificity']:.4f} IoU={macro['iou']:.4f} Dice={macro['dice']:.4f}"
+        )
+
+        metrics_csv = eval_dir / f"eval_metrics_{weights_stem}_thr{thr_tag}.csv"
+        save_eval_metrics_csv(reports + [macro], metrics_csv)
+
+    summary_json = eval_dir / f"eval_summary_{weights_stem}_thr{thr_tag}.json"
+    save_json(summary, summary_json)
+    print("[OK] saved summary json:", summary_json)
 
     if args.save_grid_overlay:
         grid_path = eval_dir / f"eval_overlay_grid_{weights_stem}_thr{thr_tag}.png"
         save_overlay_grid_eval(
-            val_pairs=val_pairs, model=model, out_path=grid_path, img_h=int(args.img_h), img_w=int(args.img_w),
-            thr=float(args.threshold), n=int(args.grid_n), cols=int(args.grid_cols), alpha=float(args.grid_alpha),
+            val_pairs=test_pairs,
+            model=model,
+            out_path=grid_path,
+            img_h=int(args.img_h),
+            img_w=int(args.img_w),
+            thr=float(args.threshold),
+            n=int(args.grid_n),
+            cols=int(args.grid_cols),
+            alpha=float(args.grid_alpha),
             seed=int(args.seed),
         )
-    print("[DONE] eval")
+
+    print("[DONE] test eval")
     cleanup(model)
 
 # ======================
@@ -997,14 +1120,14 @@ def parse_args():
 
     p.add_argument("--data_root", type=str, default=BASE_DIR)
     p.add_argument("--out_dir", type=str, default=DEFAULT_OUT_DIR)
-    p.add_argument("--cfg_json", type=str, default="", help="Optional cfg json (train/eval). If empty, uses default locations.")
+    p.add_argument("--test_split", type=str, default="test")
+    p.add_argument("--cfg_json", type=str, default="models/severity/leaf_mask/best_tuned_cfg.json", help="Optional cfg json (train/eval). If empty, uses default locations.")
     p.add_argument("--img_h", type=int, default=480)
     p.add_argument("--img_w", type=int, default=640)
     p.add_argument("--batch_size", type=int, default=1)
-    p.add_argument("--epochs", type=int, default=10)
+    p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--patience", type=int, default=6)
     p.add_argument("--seed", type=int, default=GLOBAL_SEED)
-    p.add_argument("--mixed_precision", action="store_true", help="Enable mixed precision (if supported).")
 
     p.add_argument("--trials", type=int, default=30)
 
@@ -1027,7 +1150,7 @@ def main():
     args = parse_args()
     seed_everything(args.seed)
     set_memory_growth()
-    enable_mixed_precision(bool(args.mixed_precision))
+    # enable_mixed_precision(bool(args.mixed_precision))
 
     if args.mode in ["tune", "train"]:
         ensure_dir(Path(args.out_dir))

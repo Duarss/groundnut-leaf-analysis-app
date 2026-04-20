@@ -1,0 +1,88 @@
+{
+  "cmd": "tune",
+  "backbone": "densenet201",
+  "img_size": [
+    224,
+    224
+  ],
+  "search_method": "random",
+  "trials": 30,
+  "proxy": {
+    "phase1_epochs": 3,
+    "phase2_epochs": 12,
+    "patience": 2
+  },
+  "domain": {
+    "head_type": [
+      "gap",
+      "gap_gmp",
+      "swish",
+      "mlp2"
+    ],
+    "dense_units": [
+      256,
+      384,
+      512
+    ],
+    "drop1": [
+      0.2,
+      0.3,
+      0.4
+    ],
+    "drop2": [
+      0.2,
+      0.3,
+      0.4
+    ],
+    "dense_l2": [
+      0.0,
+      1e-05,
+      0.0001
+    ],
+    "dense_units2": [
+      128,
+      192,
+      256
+    ],
+    "drop3": [
+      0.2,
+      0.3
+    ],
+    "lr_phase1": [
+      0.001,
+      0.0005,
+      0.0003
+    ],
+    "lr_phase2": [
+      0.0001,
+      5e-05,
+      3e-05
+    ],
+    "unfreeze_last_n_layers": [
+      20,
+      40,
+      60
+    ]
+  },
+  "trials_csv": "models/classification\\densenet201\\tune_cfg_cand_trials.csv",
+  "best_proxy": {
+    "val_loss": 0.07753332704305649,
+    "val_acc": 0.9797688126564026,
+    "cfg": {
+      "head": {
+        "head_type": "gap",
+        "dense_units": 384,
+        "drop1": 0.2,
+        "drop2": 0.2,
+        "dense_l2": 1e-05,
+        "dense_units2": 128,
+        "drop3": 0.3
+      },
+      "schedule": {
+        "lr_phase1": 0.001,
+        "lr_phase2": 0.0001,
+        "unfreeze_last_n_layers": 40
+      }
+    }
+  }
+}

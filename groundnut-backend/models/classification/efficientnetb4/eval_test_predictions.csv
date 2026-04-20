@@ -1,0 +1,122 @@
+filepath,true_idx,pred_idx,true_label,pred_label,confidence,correct
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(101).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(113).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9994322657585144,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(114).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9998470544815063,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(116).jpg,0,2,ALTERNARIA LEAF SPOT,LEAF SPOT (EARLY AND LATE),0.9959457516670227,False
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(119).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9999996423721313,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(159).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(162).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9999997615814209,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(171).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(180).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9999995231628418,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(20).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(214).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(216).jpg,0,2,ALTERNARIA LEAF SPOT,LEAF SPOT (EARLY AND LATE),0.9975814819335938,False
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(244).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9214391708374023,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(253).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9998880624771118,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(255).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(258).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(26).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9989129304885864,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(268).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(28).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9445277452468872,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(301).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(304).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(349).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9999998807907104,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(352).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(412).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(416).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(438).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(70).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,0.9998152852058411,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(77).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\ALTERNARIA LEAF SPOT\Alternaria_Leaf_Spot_(89).jpg,0,0,ALTERNARIA LEAF SPOT,ALTERNARIA LEAF SPOT,1.0,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (10).jpg,1,1,HEALTHY,HEALTHY,0.9999943971633911,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (131).jpg,1,1,HEALTHY,HEALTHY,0.999994158744812,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (135).jpg,1,1,HEALTHY,HEALTHY,0.9999998807907104,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (136).jpg,1,1,HEALTHY,HEALTHY,0.999461829662323,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (137).jpg,1,1,HEALTHY,HEALTHY,0.9999970197677612,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (142).jpg,1,1,HEALTHY,HEALTHY,0.9999970197677612,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (149).jpg,1,1,HEALTHY,HEALTHY,0.9989896416664124,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (188).jpg,1,1,HEALTHY,HEALTHY,0.9999983310699463,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (189).jpg,1,1,HEALTHY,HEALTHY,0.9999998807907104,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (192).jpg,1,1,HEALTHY,HEALTHY,0.9999924898147583,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (193).jpg,1,1,HEALTHY,HEALTHY,0.999998927116394,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (203).jpg,1,1,HEALTHY,HEALTHY,0.9999995231628418,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (205).jpg,1,1,HEALTHY,HEALTHY,0.9999998807907104,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (220).jpg,1,1,HEALTHY,HEALTHY,0.9999995231628418,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (223).jpg,1,1,HEALTHY,HEALTHY,0.9999949932098389,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (252).jpg,1,1,HEALTHY,HEALTHY,0.9999997615814209,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (266).jpg,1,1,HEALTHY,HEALTHY,0.999994158744812,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (271).jpg,1,1,HEALTHY,HEALTHY,0.9999933242797852,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (281).jpg,1,1,HEALTHY,HEALTHY,0.9999948740005493,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (323).jpg,1,1,HEALTHY,HEALTHY,0.9999979734420776,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (328).jpg,1,1,HEALTHY,HEALTHY,0.999998927116394,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (336).jpg,1,1,HEALTHY,HEALTHY,0.9999997615814209,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (339).jpg,1,1,HEALTHY,HEALTHY,0.9999997615814209,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (349).jpg,1,1,HEALTHY,HEALTHY,0.9944844841957092,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (369).jpg,1,1,HEALTHY,HEALTHY,0.9999988079071045,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (383).jpg,1,1,HEALTHY,HEALTHY,0.9999998807907104,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (386).jpg,1,1,HEALTHY,HEALTHY,0.999998927116394,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (388).jpg,1,1,HEALTHY,HEALTHY,0.9999992847442627,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (389).jpg,1,1,HEALTHY,HEALTHY,0.9596705436706543,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (399).jpg,1,1,HEALTHY,HEALTHY,0.9958664178848267,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (401).jpg,1,1,HEALTHY,HEALTHY,0.999919056892395,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (419).jpg,1,1,HEALTHY,HEALTHY,0.9999903440475464,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (424).jpg,1,1,HEALTHY,HEALTHY,0.9999539852142334,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (430).jpg,1,1,HEALTHY,HEALTHY,0.9999946355819702,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (447).jpg,1,1,HEALTHY,HEALTHY,0.9999896287918091,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (451).jpg,1,1,HEALTHY,HEALTHY,0.9999995231628418,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (493).jpg,1,1,HEALTHY,HEALTHY,0.999983549118042,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (510).jpg,1,1,HEALTHY,HEALTHY,0.9998868703842163,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (520).jpg,1,1,HEALTHY,HEALTHY,0.9806452393531799,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (528).jpg,1,1,HEALTHY,HEALTHY,0.9999592304229736,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (53).jpg,1,1,HEALTHY,HEALTHY,0.9998219609260559,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (536).jpg,1,1,HEALTHY,HEALTHY,0.9999486207962036,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (555).jpg,1,1,HEALTHY,HEALTHY,0.9999756813049316,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (597).jpg,1,1,HEALTHY,HEALTHY,0.9999992847442627,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (64).jpg,1,1,HEALTHY,HEALTHY,0.9999948740005493,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (83).jpg,1,1,HEALTHY,HEALTHY,0.9999992847442627,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (84).jpg,1,1,HEALTHY,HEALTHY,0.9999988079071045,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (89).jpg,1,1,HEALTHY,HEALTHY,0.9999985694885254,True
+datasets/processed/classification_dataset\test\HEALTHY\Healthy (93).jpg,1,1,HEALTHY,HEALTHY,0.9999945163726807,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(11).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.999650239944458,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(127).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999998807907104,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(147).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999988079071045,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(162).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(177).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999998807907104,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(186).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999996423721313,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(211).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(229).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999874830245972,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(285).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999901056289673,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(30).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999383687973022,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(301).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999949932098389,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(306).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(337).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(35).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999992847442627,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(355).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(37).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999556541442871,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(373).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(408).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999995231628418,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(415).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.999818742275238,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(417).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9998311996459961,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(418).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999996423721313,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(424).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999998807907104,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(432).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(44).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(443).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999998807907104,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(47).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(5).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),0.9999998807907104,True
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(59).jpg,2,0,LEAF SPOT (EARLY AND LATE),ALTERNARIA LEAF SPOT,0.5732173323631287,False
+datasets/processed/classification_dataset\test\LEAF SPOT (EARLY AND LATE)\Leaf_Spot_(79).jpg,2,2,LEAF SPOT (EARLY AND LATE),LEAF SPOT (EARLY AND LATE),1.0,True
+datasets/processed/classification_dataset\test\ROSETTE\Rosette_(16).jpg,3,3,ROSETTE,ROSETTE,0.8224865198135376,True
+datasets/processed/classification_dataset\test\ROSETTE\Rosette_(38).jpg,3,3,ROSETTE,ROSETTE,0.9999176263809204,True
+datasets/processed/classification_dataset\test\ROSETTE\Rosette_(58).jpg,3,3,ROSETTE,ROSETTE,1.0,True
+datasets/processed/classification_dataset\test\ROSETTE\Rosette_(60).jpg,3,3,ROSETTE,ROSETTE,1.0,True
+datasets/processed/classification_dataset\test\ROSETTE\Rosette_(65).jpg,3,3,ROSETTE,ROSETTE,1.0,True
+datasets/processed/classification_dataset\test\ROSETTE\Rosette_(67).jpg,3,3,ROSETTE,ROSETTE,1.0,True
+datasets/processed/classification_dataset\test\ROSETTE\Rosette_(79).jpg,3,3,ROSETTE,ROSETTE,1.0,True
+datasets/processed/classification_dataset\test\RUST\Rust_(22).jpg,4,4,RUST,RUST,1.0,True
+datasets/processed/classification_dataset\test\RUST\Rust_(3).jpg,4,4,RUST,RUST,1.0,True
+datasets/processed/classification_dataset\test\RUST\Rust_(5).jpg,4,4,RUST,RUST,1.0,True
+datasets/processed/classification_dataset\test\RUST\Rust_(76).jpg,4,4,RUST,RUST,1.0,True
+datasets/processed/classification_dataset\test\RUST\Rust_(79).jpg,4,4,RUST,RUST,0.9999984502792358,True
+datasets/processed/classification_dataset\test\RUST\Rust_(8).jpg,4,4,RUST,RUST,1.0,True
+datasets/processed/classification_dataset\test\RUST\Rust_(89).jpg,4,4,RUST,RUST,0.9999995231628418,True

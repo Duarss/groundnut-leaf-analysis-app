@@ -1,20 +1,12 @@
 {
-  "base_filters": 8,
-  "depth": 4,
-  "use_bn": false,
+  "base_filters": 16,
+  "depth": 3,
+  "use_bn": true,
   "dropout": 0.0,
   "sep_conv": false,
-  "w_dice": 0.7,
-  "w_bce": 0.3,
-  "use_focal": false,
   "lr": 0.001,
   "optimizer": "adam",
-  "img_h": 480,
-  "img_w": 640,
-  "batch_size": 1,
-  "objective": "val_loss",
-  "best_val_loss": 0.09127634018659592,
-  "best_val_dice50": 0.9583130478858948,
-  "best_val_iou50": 0.9199625849723816,
-  "seed": 42
+  "w_dice": 0.6,
+  "w_bce": 0.4,
+  "use_focal": true
 }
