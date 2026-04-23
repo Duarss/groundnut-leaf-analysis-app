@@ -24,7 +24,7 @@ class Config:
     STORAGE_DIR = os.environ.get("STORAGE_DIR", os.path.join(BASE_DIR, "storage"))
     STORAGE_ANALYSIS_DIR = os.path.join(STORAGE_DIR, "analysis_results")
 
-    CLSF_MODEL_DIR = os.path.join(BASE_DIR, "models", "classification")
+    CLSF_MODEL_DIR = os.path.join(BASE_DIR, "models", "classification", "efficientnetb4")
 
     BEST_CLSF_TUNED_CFG_PATH = os.environ.get(
         "BEST_CLSF_TUNED_CFG_PATH",
